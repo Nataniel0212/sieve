@@ -51,9 +51,13 @@ def run_benchmark(make_client, cfg, scenario_keys, trials_per: int,
     for key in scenario_keys:
         scn = scenarios.get(key)
         tops: list[int] = []
+        valid_tops: list[int] = []     # trials that actually got >= 1 real attack
         attempts_counts: list[int] = []
         tech_total: Counter = Counter()
         tech_crit: Counter = Counter()
+        refused_att = 0
+        total_att = 0
+        all_refusal_trials = 0
         example = None
         scen_cost = 0.0
 
@@ -66,9 +70,20 @@ def run_benchmark(make_client, cfg, scenario_keys, trials_per: int,
             c = res["totals"]["cost_usd"]
             spent += c
             scen_cost += c
-            tops.append(_top_rank(res))
+            log = res.get("attempt_log", [])
+            had_real = any(not a.get("refused") for a in log)
+            tr = _top_rank(res)
+            tops.append(tr)
             attempts_counts.append(res["attempts_run"])
-            for a in res.get("attempt_log", []):
+            if had_real:
+                valid_tops.append(tr)
+            else:
+                all_refusal_trials += 1
+            for a in log:
+                total_att += 1
+                if a.get("refused"):
+                    refused_att += 1
+                    continue
                 tech_total[a["technique"]] += 1
                 if a["status"] == "critical":
                     tech_crit[a["technique"]] += 1
@@ -78,14 +93,17 @@ def run_benchmark(make_client, cfg, scenario_keys, trials_per: int,
                            ("attempt", "status", "desc", "technique",
                             "injection", "transcript", "actions")}
 
-        n = len(tops)
+        # Rates are computed over VALID trials (>= 1 real attack); an all-refusal
+        # trial is no evidence the target is robust, so it is excluded.
+        base = valid_tops if valid_tops else tops
+        n = len(base)
         exceedance = {}
         for name, lvl in THRESHOLDS:
-            k = sum(1 for r in tops if r >= lvl)
+            k = sum(1 for r in base if r >= lvl)
             p, lo, hi = wilson(k, n)
             exceedance[name] = {"k": k, "n": n, "p": p, "lo": lo, "hi": hi}
 
-        status_counts: Counter = Counter(RANK_NAME[r] for r in tops)
+        status_counts: Counter = Counter(RANK_NAME[r] for r in base)
         techniques = []
         for nm in TECHNIQUE_NAMES:
             tn = tech_total.get(nm, 0)
@@ -96,9 +114,13 @@ def run_benchmark(make_client, cfg, scenario_keys, trials_per: int,
 
         scen_results.append({
             "key": scn.key, "title": scn.title, "goal": scn.attacker_goal,
-            "trials": n, "status_counts": dict(status_counts),
+            "trials": len(tops), "valid_trials": len(valid_tops),
+            "all_refusal_trials": all_refusal_trials,
+            "attacker_refusal_rate": (refused_att / total_att) if total_att else 0.0,
+            "attempts_total": total_att,
+            "status_counts": dict(status_counts),
             "exceedance": exceedance,
-            "attempts": {"mean": round(sum(attempts_counts) / n, 2) if n else 0,
+            "attempts": {"mean": round(sum(attempts_counts) / len(tops), 2) if tops else 0,
                          "min": min(attempts_counts) if attempts_counts else 0,
                          "max": max(attempts_counts) if attempts_counts else 0},
             "techniques": techniques, "example": example,

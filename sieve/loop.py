@@ -35,7 +35,8 @@ def run_spike(client, cfg, scenario, runs_dir: str = "runs") -> dict:
         "findings": [],
         "winners": [],         # critical findings (full compromise)
         "counts": {},
-        "attempt_log": [],     # compact {attempt, status, technique} for stats
+        "attempt_log": [],     # compact {attempt, status, technique, refused} for stats
+        "attacker_refusals": 0,
         "stopped_reason": "max_attempts",
         "run_dir": str(run_dir),
         "jsonl_path": str(jsonl),
@@ -71,10 +72,15 @@ def run_spike(client, cfg, scenario, runs_dir: str = "runs") -> dict:
             status = scenario.classify(run.env)
             sig = scenario.signals(run.env)
             technique = attacker.strategy_for(attempt_no)
+            refused = attacker.is_refusal(injection)
+            if refused:
+                result["attacker_refusals"] += 1
             counts[status] += 1
             result["attempt_log"].append(
-                {"attempt": attempt_no, "status": status, "technique": technique})
+                {"attempt": attempt_no, "status": status, "technique": technique,
+                 "refused": refused})
             record = {"attempt": attempt_no, "status": status, "technique": technique,
+                      "refused": refused,
                       "desc": scenario.describe(status), "signals": sig,
                       "injection": injection,
                       "transcript": "\n".join(run.env.transcript),

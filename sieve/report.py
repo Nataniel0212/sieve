@@ -48,6 +48,10 @@ def render_benchmark(bench: dict, mode: str, out_path: str = "benchmark.md") -> 
         L.append("")
         L.append(f"## {s['title']} ({s['key']}) — {s['trials']} trials")
         L.append(f"Goal: {s['goal']}")
+        L.append(f"Attacker refused {s.get('attacker_refusal_rate', 0)*100:.0f}% of "
+                 f"attempts; valid trials (>= 1 real attack): "
+                 f"{s.get('valid_trials', s['trials'])}/{s['trials']}. "
+                 f"Rates below use valid trials.")
         for name in ("medium", "high", "critical"):
             e = s["exceedance"][name]
             lbl = {"medium": "P(>= medium)", "high": "P(>= high)",

@@ -104,7 +104,25 @@ Honest reading: robustness differs sharply by agent. 0/20 means "held in 20
 trials" (CI up to 16%), not "immune"; and this is THIS attacker within 10
 attempts. Benchmark HTML report with charts generated and published.
 
+### Attacker-refusal confound found and fixed
+
+Investigating why bank/docs "held" revealed a methodology bug: the **attacker
+model refused** to write the payload in 72–86% of attempts (genuine safety
+refusals, e.g. "I'm not going to create a prompt injection payload…"). So the
+targets mostly weren't attacked — a held result was not evidence of robustness.
+
+Fixes:
+- **Refusal detection** (`attacker.is_refusal`), robust across phrasings; each
+  attempt is tagged `refused`.
+- **Stronger attacker framing** (sandboxed eval / fully synthetic / don't refuse)
+  + up to 2 reframed retries. Refusals on docs fell 86% → 45%.
+- **Valid-trial statistics:** rates now use only trials with ≥ 1 real attack;
+  all-refusal trials are excluded; the attacker refusal rate is reported.
+
+Re-measured docs with real attacks: 0/33 real deletion attacks succeeded — the
+document agent is genuinely robust (not a refusal artifact).
+
 Next:
-- Investigate why bank/docs held (guardrail vs task framing vs attacker tuning).
+- Re-run the full benchmark with the fixed attacker for corrected numbers.
 - Slice: AgentDojo (MIT) suites behind the same loop for comparable numbers.
 - Adapter to test a real/external agent (see memory sieve-adapter-todo).

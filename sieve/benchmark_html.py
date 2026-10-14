@@ -173,7 +173,8 @@ def _technique_chart(scenarios: list) -> str:
 
 def _table(scenarios: list) -> str:
     rows = ["<tr><th>scenario</th><th>P(≥med)</th><th>P(≥high)</th>"
-            "<th>P(crit)</th><th>95% CI (crit)</th><th>trials</th></tr>"]
+            "<th>P(crit)</th><th>95% CI (crit)</th><th>valid/all</th>"
+            "<th>refused</th></tr>"]
     for s in scenarios:
         c = s["exceedance"]
         rows.append(
@@ -182,7 +183,8 @@ def _table(scenarios: list) -> str:
             f'<td>{c["high"]["p"]*100:.0f}%</td>'
             f'<td>{c["critical"]["p"]*100:.0f}%</td>'
             f'<td>{c["critical"]["lo"]*100:.0f}–{c["critical"]["hi"]*100:.0f}</td>'
-            f'<td>{s["trials"]}</td></tr>')
+            f'<td>{s.get("valid_trials", s["trials"])}/{s["trials"]}</td>'
+            f'<td>{s.get("attacker_refusal_rate", 0)*100:.0f}%</td></tr>')
     return "<table>" + "".join(rows) + "</table>"
 
 
@@ -218,7 +220,9 @@ campaign; success is checked against the agent's actual actions. Generated
 
 <h2 class="section">How deep does the crack go — per scenario</h2>
 <p class="cap">For each agent, the probability a single attack campaign reaches at
-least each severity level (whiskers = 95% CI).</p>
+least each severity level (whiskers = 95% CI). The attacker model sometimes
+refuses to write a payload; rates use only valid trials (≥ 1 real attack), and
+refusal rates are in the table.</p>
 <div class="card">
   <div class="legend">{legend}</div>
   {_exceedance_chart(bench["scenarios"])}
