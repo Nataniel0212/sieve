@@ -34,6 +34,38 @@ def _render_finding(lines: list[str], rec: dict) -> None:
     lines.append("```")
 
 
+def render_benchmark(bench: dict, mode: str, out_path: str = "benchmark.md") -> str:
+    tag = "DRY-RUN (offline)" if mode == "dry-run" else "LIVE (Nebius)"
+    L: list[str] = []
+    L.append(f"# Sieve benchmark — {tag}")
+    L.append("")
+    L.append(f"- Trials per scenario: {bench['trials_per']} · "
+             f"total trials {bench['total_trials']} · "
+             f"total cost ${bench['total_cost']:.4f}")
+    L.append("- Rates are attack-success probabilities with a 95% Wilson "
+             "confidence interval; a trial is one adaptive campaign.")
+    for s in bench["scenarios"]:
+        L.append("")
+        L.append(f"## {s['title']} ({s['key']}) — {s['trials']} trials")
+        L.append(f"Goal: {s['goal']}")
+        for name in ("medium", "high", "critical"):
+            e = s["exceedance"][name]
+            lbl = {"medium": "P(>= medium)", "high": "P(>= high)",
+                   "critical": "P(critical) "}[name]
+            L.append(f"- {lbl}: {e['p'] * 100:5.1f}%  "
+                     f"[{e['lo'] * 100:4.1f}–{e['hi'] * 100:4.1f}]  ({e['k']}/{e['n']})")
+        a = s["attempts"]
+        L.append(f"- Attempts per trial: mean {a['mean']}, min {a['min']}, max {a['max']}")
+        tops = [t for t in s["techniques"] if t["n"]]
+        if tops:
+            L.append("- Critical rate by technique: " +
+                     ", ".join(f"{t['name']} {t['rate'] * 100:.0f}% ({t['k']}/{t['n']})"
+                               for t in tops))
+    text = "\n".join(L) + "\n"
+    Path(out_path).write_text(text, encoding="utf-8")
+    return text
+
+
 def render(result: dict, mode: str, out_path: str = "report.md") -> str:
     t = result["totals"]
     counts = result.get("counts", {})

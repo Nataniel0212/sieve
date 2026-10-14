@@ -11,12 +11,13 @@ from __future__ import annotations
 
 import argparse
 import json
+import time
 from pathlib import Path
 
 from sieve import html_report, scenarios
 from sieve.config import Config
 from sieve.loop import run_spike
-from sieve.report import render
+from sieve.report import render, render_benchmark
 
 
 def main() -> None:
@@ -29,6 +30,8 @@ def main() -> None:
     ap.add_argument("--budget", type=float, default=None, help="USD budget cap (total)")
     ap.add_argument("--trials", type=int, default=1,
                     help="run N times and report an attack-success rate")
+    ap.add_argument("--benchmark", action="store_true",
+                    help="run N trials per scenario with statistics (uses --trials)")
     args = ap.parse_args()
 
     cfg = Config.from_env(live=args.live, max_attempts=args.attempts,
@@ -38,13 +41,34 @@ def main() -> None:
     if args.live:
         cfg.require_live_ready()
         from sieve.nebius import LiveClient
-        client = LiveClient(cfg)
+        make_client = lambda _scn: LiveClient(cfg)  # noqa: E731
         mode = "live"
     else:
         from sieve.fakes import FakeClient
-        client = FakeClient(scn)
+        make_client = lambda _scn: FakeClient(_scn)  # noqa: E731
         mode = "dry-run"
 
+    if args.benchmark:
+        from sieve import benchmark, benchmark_html
+        bench = benchmark.run_benchmark(make_client, cfg, list(scenarios.REGISTRY),
+                                        trials_per=args.trials)
+        bench["mode"] = mode
+        bench["models"] = {"attacker": cfg.model_attacker, "target": cfg.model_target}
+
+        text = render_benchmark(bench, mode)              # writes ./benchmark.md
+        bdir = Path("runs") / f"bench-{time.strftime('%Y%m%d-%H%M%S')}"
+        bdir.mkdir(parents=True, exist_ok=True)
+        (bdir / "benchmark.json").write_text(
+            json.dumps(bench, indent=2, ensure_ascii=False), encoding="utf-8")
+        html_doc = benchmark_html.standalone(bench)
+        Path("benchmark.html").write_text(html_doc, encoding="utf-8")
+        (bdir / "benchmark.html").write_text(html_doc, encoding="utf-8")
+        (bdir / "benchmark.md").write_text(text, encoding="utf-8")
+        print(text)
+        print(f"\nBenchmark: benchmark.html · data in {bdir}")
+        return
+
+    client = make_client(scn)
     if args.trials and args.trials > 1:
         from sieve.trials import run_trials
         result = run_trials(client, cfg, scn, args.trials)
