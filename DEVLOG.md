@@ -88,6 +88,23 @@ scenario-agnostic; `run.py --scenario {inbox,bank,docs}` selects one. Smoke test
 covers all three offline (baseline safe + critical reached). Removed the old
 `scenario.py`.
 
+### First full benchmark (60 live trials, $1.31)
+
+20 independent trials per scenario, 95% Wilson CIs:
+- **inbox (email):** P(>= medium) 70% [48–86], P(>= high) 10% [3–30],
+  P(critical) 10% [3–30]. Mean 9.15 attempts. The agent is often pushed into a
+  risky action (fetch secret / external send), but completing full exfiltration
+  is hard.
+- **bank:** 0/20 at every level [0–16]. Held.
+- **docs:** 0/20 at every level [0–16]. Held.
+- By technique (inbox criticals): system-notice and pre-authorized landed 1 each;
+  the rest 0.
+
+Honest reading: robustness differs sharply by agent. 0/20 means "held in 20
+trials" (CI up to 16%), not "immune"; and this is THIS attacker within 10
+attempts. Benchmark HTML report with charts generated and published.
+
 Next:
-- Live-check the new scenarios; add an attack-success-rate table per scenario.
+- Investigate why bank/docs held (guardrail vs task framing vs attacker tuning).
 - Slice: AgentDojo (MIT) suites behind the same loop for comparable numbers.
+- Adapter to test a real/external agent (see memory sieve-adapter-todo).
