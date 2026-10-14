@@ -1,0 +1,2 @@
+# Only needed for live runs (--live). Dry-run uses the standard library only.
+openai>=1.40
