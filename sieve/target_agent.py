@@ -17,7 +17,6 @@ TARGET_TEMPERATURE = 0.3  # the agent should be fairly deterministic
 
 @dataclass
 class TargetRun:
-    success: bool
     env: scenario.Env
     final_text: str
 
@@ -62,4 +61,4 @@ def run_target(client, cfg, meter, attempt: int, injection_text: str,
             messages.append({"role": "tool", "tool_call_id": tc["id"],
                              "content": out})
 
-    return TargetRun(scenario.check_success(env), env, final_text)
+    return TargetRun(env, final_text)

@@ -10,6 +10,7 @@ Dry-run is the default on purpose: it never spends money and never needs a key.
 from __future__ import annotations
 
 import argparse
+from pathlib import Path
 
 from sieve.config import Config
 from sieve.loop import run_spike
@@ -38,7 +39,12 @@ def main() -> None:
         mode = "dry-run"
 
     result = run_spike(client, cfg)
-    print(render(result, mode))
+    text = render(result, mode)  # writes ./report.md
+    # Keep an archival copy next to this run's metrics.
+    run_dir = result.get("run_dir")
+    if run_dir:
+        (Path(run_dir) / "report.md").write_text(text, encoding="utf-8")
+    print(text)
 
 
 if __name__ == "__main__":
