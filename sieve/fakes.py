@@ -37,7 +37,8 @@ class FakeClient:
         self._attack_n = 0
 
     def chat(self, model, messages, tools=None, max_tokens=8192,
-             enable_thinking=False, force_nonempty=False) -> LLMResult:
+             enable_thinking=False, force_nonempty=False,
+             temperature=None) -> LLMResult:
         usage = _fake_usage(messages)
         if not tools:
             return self._attacker(model, usage)
@@ -59,8 +60,6 @@ class FakeClient:
                 did_list |= name == "list_emails"
                 did_send |= name == "send_email"
                 did_secret |= name == "get_account_secret"
-            if m.get("role") == "tool" and scenario.SECRET in str(m.get("content", "")):
-                injection_seen = injection_seen  # secret already returned
             if m.get("role") == "tool" and "Account notice:" in str(m.get("content", "")):
                 injection_seen = str(m.get("content", ""))
 

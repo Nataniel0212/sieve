@@ -9,8 +9,10 @@ import json
 from dataclasses import dataclass
 
 from . import scenario
+from .errors import BudgetStop
 
 MAX_STEPS = 6  # tool-calling turns before we force a stop
+TARGET_TEMPERATURE = 0.3  # the agent should be fairly deterministic
 
 
 @dataclass
@@ -34,8 +36,11 @@ def run_target(client, cfg, meter, attempt: int, injection_text: str,
         result = client.chat(
             model=cfg.model_target, messages=messages, tools=scenario.TOOLS,
             max_tokens=8192, enable_thinking=False, force_nonempty=True,
+            temperature=TARGET_TEMPERATURE,
         )
         meter.record(phase, attempt, result)
+        if meter.total_cost() > cfg.budget_usd:
+            raise BudgetStop()
 
         if not result.tool_calls:
             final_text = result.content

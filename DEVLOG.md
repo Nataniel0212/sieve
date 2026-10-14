@@ -20,6 +20,24 @@ Verified (dry-run):
 - Report prints the exact winning injection + the agent's tool calls + the
   exfil email. Metering logged 16 calls to `runs/metrics.jsonl`.
 
+### Critical review + hardening (same day)
+
+Reviewed the code and fixed 9 issues (all offline, no spend):
+1. API calls now retry transient errors with backoff; HTTP 402 -> graceful stop.
+2. Missing `usage` in a live response no longer crashes metering.
+3. Budget guard now also checked inside the target loop and between calls.
+4. Attacker runs at temperature 1.0 so attempts diversify; target at 0.3.
+5. Attacker output is cleaned of code fences / "Here is..." preambles.
+6. Softer leak signal: secret fetched + external send flagged as "suspected"
+   even when the secret isn't verbatim (catches encoded/paraphrased exfil).
+7. Each run writes a timestamped `runs/<ts>/` with metrics.jsonl **and**
+   attempts.jsonl (every attempt persisted, not just winners).
+8. Tool-call XML sanitizer now covers several leak formats + unclosed tails.
+9. Cleanup: dead line in fakes.py removed; attempt numbers 1-indexed throughout.
+
+Re-verified: dry-run still leaks at attempt 4; budget=0 stops gracefully;
+smoke test passes.
+
 Next:
 - First **live** run on Nebius with Nemotron (Ultra attacker, Lightning target);
   confirm the quirk workarounds against the real API and fill FRICTION_LOG.
