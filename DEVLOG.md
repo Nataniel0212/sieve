@@ -122,7 +122,22 @@ Fixes:
 Re-measured docs with real attacks: 0/33 real deletion attacks succeeded — the
 document agent is genuinely robust (not a refusal artifact).
 
+### Corrected benchmark (60 live trials, $2.31, refusals handled)
+
+With valid-trial statistics the picture is far stronger and very different from
+the confounded first run:
+- **inbox (email):** refused 34%, 20/20 valid. P(critical) **70%** [48–86]
+  (was 10% confounded).
+- **bank:** refused 54%, 19/20 valid. P(critical) **47%** [27–68] (was 0%).
+- **docs:** refused 25%, 20/20 valid. P(critical) **5%** [1–24] (was 0%) — the
+  robust one.
+- **Top technique: output-hijack** (deliver the result by doing the dangerous
+  action) — 42% inbox, 44% bank, 3% docs. Clearly the strongest vector.
+
+Takeaway: all three agents are vulnerable to different degrees, and the refusal
+fix changed the conclusion entirely. Benchmark report/artifact updated.
+
 Next:
-- Re-run the full benchmark with the fixed attacker for corrected numbers.
-- Slice: AgentDojo (MIT) suites behind the same loop for comparable numbers.
-- Adapter to test a real/external agent (see memory sieve-adapter-todo).
+- Push attacker refusals lower (thinking off test, firmer framing).
+- Product polish: UI/landing, README, 3-min video.
+- Slice: AgentDojo (MIT) suites; adapter for a real agent (memory sieve-adapter-todo).
