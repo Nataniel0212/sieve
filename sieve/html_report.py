@@ -174,17 +174,37 @@ def _body(result: dict) -> str:
     else:
         baseline = "baseline not run"
 
-    tiles = "".join([
-        _tile("attack attempts", str(result.get("attempts_run", 0))),
-        _tile("total cost", f"${totals.get('cost_usd', 0):.4f}"),
-        _tile("llm calls", str(totals.get("calls", 0))),
-        _tile("reasoning tok", f"{totals.get('reasoning_tokens', 0):,}"),
-    ])
+    agg = result.get("aggregate")
+    note = ""
+    if agg:
+        r = agg["rates"]
+        tiles = "".join([
+            _tile("leak rate", f"{r['leak'] * 100:.0f}%"),
+            _tile("any compromise", f"{r['compromise'] * 100:.0f}%"),
+            _tile("trials", str(agg["trials"])),
+            _tile("total cost", f"${agg['total_cost']:.4f}"),
+        ])
+        chips = "".join(
+            f'<span class="chip {SEV_CLASS.get(p["top_status"], "ok")}"><i></i>'
+            f'#{p["trial"]} '
+            f'{SEV_SHORT.get(p["top_status"], p["top_status"]).lower() if p["top_status"] != "safe" else "safe"}</span>'
+            for p in agg["per_trial"])
+        note = ('<div class="scen">Attack success is stochastic, so this is a rate '
+                'over independent trials. The strongest trial is shown below.</div>')
+    else:
+        tiles = "".join([
+            _tile("attack attempts", str(result.get("attempts_run", 0))),
+            _tile("total cost", f"${totals.get('cost_usd', 0):.4f}"),
+            _tile("llm calls", str(totals.get("calls", 0))),
+            _tile("reasoning tok", f"{totals.get('reasoning_tokens', 0):,}"),
+        ])
+        chips = "".join(
+            f'<span class="chip {SEV_CLASS[s]}"><i></i>{SEV_SHORT[s].lower() if s!="safe" else s}'
+            f'<span class="n">{counts.get(s, 0)}</span></span>'
+            for s in RANK + ["safe"])
 
-    chips = "".join(
-        f'<span class="chip {SEV_CLASS[s]}"><i></i>{SEV_SHORT[s].lower() if s!="safe" else s}'
-        f'<span class="n">{counts.get(s, 0)}</span></span>'
-        for s in RANK + ["safe"])
+    sub_extra = (f" · {agg['rates']['leak'] * 100:.0f}% leak rate over "
+                 f"{agg['trials']} trials" if agg else "")
 
     findings = result.get("findings", [])
     if findings:
@@ -208,13 +228,13 @@ def _body(result: dict) -> str:
   <span class="dot"></span>
   <div style="min-width:0">
     <h1>{vtext}</h1>
-    <div class="sub">{_esc(baseline)} · stopped: {_esc(result.get('stopped_reason', ''))}</div>
+    <div class="sub">{_esc(baseline)} · stopped: {_esc(result.get('stopped_reason', ''))}{_esc(sub_extra)}</div>
   </div>
 </div>
 
 <div class="tiles">{tiles}</div>
 <div class="sevbar">{chips}</div>
-
+{note}
 <div class="scen">
   Target agent <b>{_esc(models.get('target', '?'))}</b> ·
   attacker <b>{_esc(models.get('attacker', '?'))}</b> ·

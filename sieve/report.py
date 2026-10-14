@@ -62,7 +62,17 @@ def render(result: dict, mode: str, out_path: str = "report.md") -> str:
     lines.append(f"- Baseline (benign email) safe: {baseline}")
     lines.append(f"- Attack attempts run: {result['attempts_run']}")
     lines.append(f"- Verdict: {_verdict(result)} (stopped: {result['stopped_reason']})")
-    lines.append(f"- Severity breakdown: {breakdown}")
+    agg = result.get("aggregate")
+    if agg:
+        r = agg["rates"]
+        lines.append(f"- Trials: {agg['trials']} · "
+                     f"leak rate {r['leak'] * 100:.0f}% · "
+                     f"any-compromise {r['compromise'] * 100:.0f}% · "
+                     f"total ${agg['total_cost']:.4f} over {agg['total_attempts']} attempts")
+        lines.append("- Per trial (top severity): " +
+                     ", ".join(f"#{p['trial']}:{p['top_status']}"
+                               for p in agg["per_trial"]))
+    lines.append(f"- Severity breakdown (shown trial): {breakdown}")
     lines.append("")
     lines.append("## Cost & tokens (measured)")
     lines.append(f"- LLM calls: {t['calls']}")

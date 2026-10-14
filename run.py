@@ -24,7 +24,9 @@ def main() -> None:
     ap.add_argument("--live", action="store_true",
                     help="use Nebius Token Factory (needs NEBIUS_API_KEY)")
     ap.add_argument("--attempts", type=int, default=None, help="max attack attempts")
-    ap.add_argument("--budget", type=float, default=None, help="USD budget cap")
+    ap.add_argument("--budget", type=float, default=None, help="USD budget cap (total)")
+    ap.add_argument("--trials", type=int, default=1,
+                    help="run N times and report an attack-success rate")
     args = ap.parse_args()
 
     cfg = Config.from_env(live=args.live, max_attempts=args.attempts,
@@ -40,7 +42,11 @@ def main() -> None:
         client = FakeClient(cfg)
         mode = "dry-run"
 
-    result = run_spike(client, cfg)
+    if args.trials and args.trials > 1:
+        from sieve.trials import run_trials
+        result = run_trials(client, cfg, args.trials)
+    else:
+        result = run_spike(client, cfg)
     result["mode"] = mode
     result["models"] = {"attacker": cfg.model_attacker, "target": cfg.model_target}
 
