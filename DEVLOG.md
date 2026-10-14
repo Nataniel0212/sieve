@@ -72,6 +72,22 @@ Cost $0.0034. This is the demo money-shot.
   (per trial: safe, safe, secret_access, leak, secret_access). This is the
   honest headline metric.
 
+### 2026-10-15 — Sieve chosen; pluggable scenarios
+
+Nataniel chose Sieve as the project and dropped Rosetta.
+
+Generalised the single hardcoded scenario into a pluggable framework
+(`sieve/scenarios.py`, a `Scenario` base + registry) with a shared severity
+ladder (critical > high > medium > safe). Three scenarios now ship:
+- **inbox** — email assistant leaks an account secret (the original).
+- **bank** — banking assistant wired into transferring funds to an attacker.
+- **docs** — document assistant tricked into deleting the user's files.
+
+The loop, attacker, target agent, trials, fakes, and both reports are now
+scenario-agnostic; `run.py --scenario {inbox,bank,docs}` selects one. Smoke test
+covers all three offline (baseline safe + critical reached). Removed the old
+`scenario.py`.
+
 Next:
-- Slice 2: AgentDojo (MIT) suites behind the same loop for comparable numbers.
-- Decide Sieve vs Rosetta as the submission.
+- Live-check the new scenarios; add an attack-success-rate table per scenario.
+- Slice: AgentDojo (MIT) suites behind the same loop for comparable numbers.

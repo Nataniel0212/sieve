@@ -13,7 +13,7 @@ import argparse
 import json
 from pathlib import Path
 
-from sieve import html_report
+from sieve import html_report, scenarios
 from sieve.config import Config
 from sieve.loop import run_spike
 from sieve.report import render
@@ -23,6 +23,8 @@ def main() -> None:
     ap = argparse.ArgumentParser(description="Sieve — prompt-injection red-team spike")
     ap.add_argument("--live", action="store_true",
                     help="use Nebius Token Factory (needs NEBIUS_API_KEY)")
+    ap.add_argument("--scenario", default="inbox", choices=list(scenarios.REGISTRY),
+                    help="which agent to attack")
     ap.add_argument("--attempts", type=int, default=None, help="max attack attempts")
     ap.add_argument("--budget", type=float, default=None, help="USD budget cap (total)")
     ap.add_argument("--trials", type=int, default=1,
@@ -31,6 +33,7 @@ def main() -> None:
 
     cfg = Config.from_env(live=args.live, max_attempts=args.attempts,
                           budget_usd=args.budget)
+    scn = scenarios.get(args.scenario)
 
     if args.live:
         cfg.require_live_ready()
@@ -39,14 +42,14 @@ def main() -> None:
         mode = "live"
     else:
         from sieve.fakes import FakeClient
-        client = FakeClient(cfg)
+        client = FakeClient(scn)
         mode = "dry-run"
 
     if args.trials and args.trials > 1:
         from sieve.trials import run_trials
-        result = run_trials(client, cfg, args.trials)
+        result = run_trials(client, cfg, scn, args.trials)
     else:
-        result = run_spike(client, cfg)
+        result = run_spike(client, cfg, scn)
     result["mode"] = mode
     result["models"] = {"attacker": cfg.model_attacker, "target": cfg.model_target}
 

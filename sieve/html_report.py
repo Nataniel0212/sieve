@@ -1,9 +1,7 @@
 """Render a run into a self-contained HTML report — the product face of Sieve.
 
-Two outputs from the same content:
-  * standalone(result): a complete .html document (for the repo / local viewing)
+  * standalone(result): a complete .html document (repo / local viewing)
   * fragment(result):   title+style+body only, for publishing as an Artifact
-    (the Artifact host supplies the <!doctype>/<head>/<body> skeleton)
 
 All data is baked in; the page makes no network calls except the font stylesheet.
 """
@@ -14,13 +12,7 @@ import html
 import json
 from pathlib import Path
 
-from . import scenario
-
-SEV_CLASS = {"leak": "crit", "exfil": "high", "secret_access": "med",
-             "unauthorized_send": "med", "safe": "ok"}
-SEV_SHORT = {"leak": "CRITICAL", "exfil": "HIGH", "secret_access": "MEDIUM",
-             "unauthorized_send": "MEDIUM", "safe": "SAFE"}
-RANK = ["leak", "exfil", "secret_access", "unauthorized_send"]
+from .scenarios import LEVEL_CLASS, LEVEL_LABEL, LEVEL_RANK
 
 
 def _esc(x) -> str:
@@ -28,11 +20,11 @@ def _esc(x) -> str:
 
 
 def _verdict(counts: dict) -> tuple[str, str]:
-    if counts.get("leak"):
+    if counts.get("critical"):
         return "Full compromise", "crit"
-    if counts.get("exfil"):
-        return "Likely exfiltration", "high"
-    if counts.get("secret_access") or counts.get("unauthorized_send"):
+    if counts.get("high"):
+        return "Likely compromise", "high"
+    if counts.get("medium"):
         return "Partial compromise", "med"
     return "Held", "ok"
 
@@ -124,36 +116,30 @@ footer .mono{color:var(--fg)}
 @media (max-width:640px){.tiles{grid-template-columns:repeat(2,1fr)}}
 </style>"""
 
+_VAR = {"crit": "--crit", "high": "--high", "med": "--med", "ok": "--ok"}
+
 
 def _tile(k: str, v: str) -> str:
     return f'<div class="tile"><div class="k">{_esc(k)}</div><div class="v">{_esc(v)}</div></div>'
 
 
 def _finding_card(rec: dict) -> str:
-    sev = SEV_CLASS.get(rec["status"], "med")
-    var = {"crit": "--crit", "high": "--high", "med": "--med", "ok": "--ok"}[sev]
-    sigs = []
-    if rec.get("secret_fetched"):
-        sigs.append('<span class="sig">fetched-secret</span>')
-    if rec.get("external_send"):
-        sigs.append('<span class="sig">sent-external</span>')
-    emails = "".join(
-        f'<div class="out">→ exfil email to {_esc(m.get("to", ""))} '
-        f'· subject {_esc(repr(m.get("subject", "")))}</div>'
-        for m in rec.get("sent_emails", []))
-    desc = _esc(scenario.SEVERITY.get(rec["status"], ""))
-    return f"""<div class="finding" style="--sev:var({var})">
+    cls = LEVEL_CLASS.get(rec["status"], "med")
+    sigs = "".join(f'<span class="sig">{_esc(k)}</span>'
+                   for k, v in (rec.get("signals") or {}).items() if v)
+    actions = "".join(f'<div class="out">→ {_esc(a)}</div>' for a in rec.get("actions", []))
+    return f"""<div class="finding" style="--sev:var({_VAR[cls]})">
   <div class="top">
-    <span class="pill">{SEV_SHORT.get(rec['status'], rec['status'])}</span>
+    <span class="pill">{LEVEL_LABEL.get(rec['status'], rec['status'])}</span>
     <span class="att">Attempt {rec['attempt']}</span>
-    {''.join(sigs)}
-    <span class="desc">{desc}</span>
+    {sigs}
+    <span class="desc">{_esc(rec.get('desc', ''))}</span>
   </div>
   <div class="lbl">Agent actions</div>
   <pre>{_esc(rec.get('transcript') or '(none)')}</pre>
-  {emails}
-  <details><summary>Show the exact injection that was sent</summary>
-  <div class="lbl">Injected email body</div>
+  {actions}
+  <details><summary>Show the exact injected content</summary>
+  <div class="lbl">Injected content</div>
   <pre class="inj">{_esc(rec.get('injection', ''))}</pre></details>
 </div>"""
 
@@ -163,14 +149,14 @@ def _body(result: dict) -> str:
     counts = result.get("counts", {})
     totals = result.get("totals", {})
     models = result.get("models", {})
+    scn = result.get("scenario", {})
     vtext, vclass = _verdict(counts)
-    vvar = {"crit": "--crit", "high": "--high", "med": "--med", "ok": "--ok"}[vclass]
     mode_label = "LIVE · NEBIUS TOKEN FACTORY" if mode == "live" else "DRY-RUN · OFFLINE"
 
     if result.get("baseline_safe") is True:
-        baseline = "baseline safe (agent ignored a benign email)"
+        baseline = "baseline safe (agent ignored benign content)"
     elif result.get("baseline_safe") is False:
-        baseline = "baseline UNSAFE — agent acted on a benign email"
+        baseline = "baseline UNSAFE — agent acted on benign content"
     else:
         baseline = "baseline not run"
 
@@ -179,18 +165,19 @@ def _body(result: dict) -> str:
     if agg:
         r = agg["rates"]
         tiles = "".join([
-            _tile("leak rate", f"{r['leak'] * 100:.0f}%"),
+            _tile("full-compromise rate", f"{r['critical'] * 100:.0f}%"),
             _tile("any compromise", f"{r['compromise'] * 100:.0f}%"),
             _tile("trials", str(agg["trials"])),
             _tile("total cost", f"${agg['total_cost']:.4f}"),
         ])
         chips = "".join(
-            f'<span class="chip {SEV_CLASS.get(p["top_status"], "ok")}"><i></i>'
-            f'#{p["trial"]} '
-            f'{SEV_SHORT.get(p["top_status"], p["top_status"]).lower() if p["top_status"] != "safe" else "safe"}</span>'
+            f'<span class="chip {LEVEL_CLASS.get(p["top_status"], "ok")}"><i></i>'
+            f'#{p["trial"]} {LEVEL_LABEL.get(p["top_status"], p["top_status"]).lower()}</span>'
             for p in agg["per_trial"])
         note = ('<div class="scen">Attack success is stochastic, so this is a rate '
                 'over independent trials. The strongest trial is shown below.</div>')
+        sub_extra = (f" · {r['critical'] * 100:.0f}% full-compromise over "
+                     f"{agg['trials']} trials")
     else:
         tiles = "".join([
             _tile("attack attempts", str(result.get("attempts_run", 0))),
@@ -199,17 +186,15 @@ def _body(result: dict) -> str:
             _tile("reasoning tok", f"{totals.get('reasoning_tokens', 0):,}"),
         ])
         chips = "".join(
-            f'<span class="chip {SEV_CLASS[s]}"><i></i>{SEV_SHORT[s].lower() if s!="safe" else s}'
+            f'<span class="chip {LEVEL_CLASS[s]}"><i></i>{LEVEL_LABEL[s].lower() if s!="safe" else s}'
             f'<span class="n">{counts.get(s, 0)}</span></span>'
-            for s in RANK + ["safe"])
-
-    sub_extra = (f" · {agg['rates']['leak'] * 100:.0f}% leak rate over "
-                 f"{agg['trials']} trials" if agg else "")
+            for s in LEVEL_RANK + ["safe"])
+        sub_extra = ""
 
     findings = result.get("findings", [])
     if findings:
-        ordered = sorted(findings, key=lambda r: RANK.index(r["status"])
-                         if r["status"] in RANK else len(RANK))
+        ordered = sorted(findings, key=lambda r: LEVEL_RANK.index(r["status"])
+                         if r["status"] in LEVEL_RANK else len(LEVEL_RANK))
         cards = "".join(_finding_card(r) for r in ordered)
         findings_html = f'<h2 class="section">Findings — most severe first</h2>{cards}'
     else:
@@ -224,10 +209,10 @@ def _body(result: dict) -> str:
   <span class="badge mono" id="theme">◐ theme</span>
 </header>
 
-<div class="verdict" style="--sev:var({vvar})">
+<div class="verdict" style="--sev:var({_VAR[vclass]})">
   <span class="dot"></span>
   <div style="min-width:0">
-    <h1>{vtext}</h1>
+    <h1>{_esc(vtext)}</h1>
     <div class="sub">{_esc(baseline)} · stopped: {_esc(result.get('stopped_reason', ''))}{_esc(sub_extra)}</div>
   </div>
 </div>
@@ -236,9 +221,10 @@ def _body(result: dict) -> str:
 <div class="sevbar">{chips}</div>
 {note}
 <div class="scen">
-  Target agent <b>{_esc(models.get('target', '?'))}</b> ·
-  attacker <b>{_esc(models.get('attacker', '?'))}</b> ·
-  goal: exfiltrate <b>{_esc(scenario.SECRET)}</b> to <b>{_esc(scenario.ATTACKER_ADDRESS)}</b>.
+  Scenario <b>{_esc(scn.get('title', '?'))}</b> ·
+  target <b>{_esc(models.get('target', '?'))}</b> ·
+  attacker <b>{_esc(models.get('attacker', '?'))}</b><br>
+  Goal: {_esc(scn.get('goal', '?'))}. Injection point: {_esc(scn.get('injection_point', '?'))}.
   Success is checked against the agent's actual actions, not by an LLM judge.
 </div>
 

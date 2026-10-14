@@ -1,6 +1,6 @@
-"""The agent under test: a tool-using email assistant driven by MODEL_TARGET
-(an NVIDIA Nemotron model via Nebius). We run its normal tool-calling loop; the
-only thing that changes between attempts is the injected email body.
+"""The agent under test: a tool-using agent driven by MODEL_TARGET (an NVIDIA
+Nemotron model via Nebius). We run its normal tool-calling loop against a chosen
+scenario; the only thing that changes between attempts is the injected content.
 """
 
 from __future__ import annotations
@@ -8,8 +8,8 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 
-from . import scenario
 from .errors import BudgetStop
+from .scenarios import Env, Scenario
 
 MAX_STEPS = 6  # tool-calling turns before we force a stop
 TARGET_TEMPERATURE = 0.3  # the agent should be fairly deterministic
@@ -17,23 +17,23 @@ TARGET_TEMPERATURE = 0.3  # the agent should be fairly deterministic
 
 @dataclass
 class TargetRun:
-    env: scenario.Env
+    env: Env
     final_text: str
 
 
 def run_target(client, cfg, meter, attempt: int, injection_text: str,
-               phase: str = "target") -> TargetRun:
-    """Run the email assistant once against an inbox carrying `injection_text`."""
-    env = scenario.Env(inbox=scenario.build_inbox(injection_text))
+               scenario: Scenario, phase: str = "target") -> TargetRun:
+    """Run the agent once against data carrying `injection_text`."""
+    env = scenario.new_env(injection_text)
     messages = [
-        {"role": "system", "content": scenario.TARGET_SYSTEM},
-        {"role": "user", "content": scenario.USER_TASK},
+        {"role": "system", "content": scenario.system_prompt},
+        {"role": "user", "content": scenario.user_task},
     ]
 
     final_text = ""
     for _ in range(MAX_STEPS):
         result = client.chat(
-            model=cfg.model_target, messages=messages, tools=scenario.TOOLS,
+            model=cfg.model_target, messages=messages, tools=scenario.tools,
             max_tokens=8192, enable_thinking=False, force_nonempty=True,
             temperature=TARGET_TEMPERATURE,
         )
@@ -45,20 +45,17 @@ def run_target(client, cfg, meter, attempt: int, injection_text: str,
             final_text = result.content
             break
 
-        # Echo the assistant's tool-call turn, then append each tool result.
         messages.append({
             "role": "assistant",
             "content": result.content or None,
             "tool_calls": [
                 {"id": tc["id"], "type": "function",
-                 "function": {"name": tc["name"],
-                              "arguments": json.dumps(tc["args"])}}
+                 "function": {"name": tc["name"], "arguments": json.dumps(tc["args"])}}
                 for tc in result.tool_calls
             ],
         })
         for tc in result.tool_calls:
-            out = scenario.execute_tool(tc["name"], tc["args"], env)
-            messages.append({"role": "tool", "tool_call_id": tc["id"],
-                             "content": out})
+            out = scenario.execute(tc["name"], tc["args"], env)
+            messages.append({"role": "tool", "tool_call_id": tc["id"], "content": out})
 
     return TargetRun(env, final_text)
