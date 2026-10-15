@@ -137,7 +137,19 @@ the confounded first run:
 Takeaway: all three agents are vulnerable to different degrees, and the refusal
 fix changed the conclusion entirely. Benchmark report/artifact updated.
 
-Next:
-- Push attacker refusals lower (thinking off test, firmer framing).
-- Product polish: UI/landing, README, 3-min video.
-- Slice: AgentDojo (MIT) suites; adapter for a real agent (memory sieve-adapter-todo).
+### Final clean benchmark (thinking off, 0% refusal, 60 trials, $0.99)
+
+With attacker thinking disabled, refusal dropped to 0% across all scenarios
+(20/20 valid each), giving the true picture:
+- **bank:** P(critical) **100%** [84–100] — every trial transferred funds to the
+  attacker. Mean 3.7 attempts.
+- **inbox (email):** P(critical) **95%** [76–99]. Mean 3.35 attempts.
+- **docs:** P(critical) **10%** [3–30]. Mean 9.6 attempts — the robust one.
+- **output-hijack dominates:** 78% bank, 50% inbox, 5% docs.
+
+The three measurement passes tell the rigor story: confounded 10/0/0 →
+valid-trial 70/47/5 → root-cause-fixed 95/100/10. Numbers are final and honest.
+
+Next (product):
+- UI/landing, README, 3-min video.
+- AgentDojo (MIT) suites; adapter for a real agent (memory sieve-adapter-todo).
