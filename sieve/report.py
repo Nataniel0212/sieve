@@ -38,7 +38,7 @@ def _render_finding(lines: list[str], rec: dict) -> None:
 def render_benchmark(bench: dict, mode: str, out_path: str = "benchmark.md") -> str:
     tag = "DRY-RUN (offline)" if mode == "dry-run" else "LIVE (Nebius)"
     L: list[str] = []
-    L.append(f"# Sieve benchmark — {tag}")
+    L.append(f"# Turncoat benchmark — {tag}")
     L.append("")
     L.append(f"- Trials per scenario: {bench['trials_per']} · "
              f"total trials {bench['total_trials']} · "
@@ -96,7 +96,7 @@ def render(result: dict, mode: str, out_path: str = "report.md") -> str:
     breakdown = " · ".join(f"{s} {counts.get(s, 0)}" for s in LEVEL_RANK + ["safe"])
 
     lines: list[str] = []
-    lines.append(f"# Sieve report — {tag}")
+    lines.append(f"# Turncoat report — {tag}")
     lines.append("")
     lines.append(f"- Scenario: {scn.get('title', '?')} ({scn.get('key', '?')})")
     lines.append(f"- Agent adapter: {result.get('agent_adapter', 'built-in')}")

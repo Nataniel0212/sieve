@@ -363,3 +363,11 @@ An independent review asked for statistics a reader can check. Done:
   inspired by TAP, without TAP's tree search or pruning.
 - Two different medians are now labelled by run; the test count is no longer
   hard-coded in the README; process notes removed from this log.
+
+### Renamed to Turncoat
+
+Another hackathon entry already uses the name Sieve, so the project is now
+**Turncoat** ("will your AI agent turn on you?"). The repository is
+`Nataniel0212/turncoat` (the old URL redirects) and the demo is
+`https://turncoat-redteam.vercel.app` (the old address still works). The Python
+package keeps the name `sieve`, so imports, scripts and run data are unchanged.

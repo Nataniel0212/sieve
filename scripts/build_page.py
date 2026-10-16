@@ -170,7 +170,7 @@ def render() -> tuple[str, dict]:
     bench += bench_card(f'{day(day2["generated"])} · independent replication', day2) + '</div>'
     bench += (f'<p class="note">Target: {escape(target)}. {attempts_note([day1, day2])} '
               'Each interval describes one day, not pooled trials. '
-              '<a href="https://github.com/Nataniel0212/sieve/tree/main/results">Raw reports and methodology ↗</a></p>')
+              '<a href="https://github.com/Nataniel0212/turncoat/tree/main/results">Raw reports and methodology ↗</a></p>')
     compare = '<div class="tablewrap"><table class="comparison"><caption>Full-compromise rate by target model</caption><thead><tr><th>Target model</th>'
     compare += "".join(f'<th>{escape(LABEL[k])}</th>' for k in comp["scenarios"]) + '</tr></thead><tbody>'
     for model in comp["models"]:

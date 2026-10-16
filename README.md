@@ -1,9 +1,9 @@
-# Sieve
+# Turncoat
 
-[![ci](https://github.com/Nataniel0212/sieve/actions/workflows/ci.yml/badge.svg)](https://github.com/Nataniel0212/sieve/actions/workflows/ci.yml)
+[![ci](https://github.com/Nataniel0212/turncoat/actions/workflows/ci.yml/badge.svg)](https://github.com/Nataniel0212/turncoat/actions/workflows/ci.yml)
 ![license](https://img.shields.io/badge/license-MIT-blue)
 
-**Does your AI agent leak like a sieve?** Sieve is an automated prompt-injection
+**Will your AI agent turn on you?** Turncoat is an automated prompt-injection
 red team and **benchmark** for tool-using LLM agents. It attacks an agent you
 control with an adaptive attacker model, checks every outcome against the agent's
 real tool calls, and reports an **attack-success rate with 95% confidence
@@ -17,8 +17,11 @@ with Nano 30B and Ultra 550B for comparison.
 > Defensive security research in the tradition of garak and PyRIT: you only test
 > agents you own. Synthetic data only. No real person, account, secret or file
 > exists anywhere in this repo.
+>
+> Formerly named Sieve. The Python package and run directories keep the name
+> `sieve`; old repository and demo links redirect or still work.
 
-**[Open the interactive demo](https://sieve-redteam.vercel.app)** — nine recorded
+**[Open the interactive demo](https://turncoat-redteam.vercel.app)** — nine recorded
 live campaigns are available without a code. Judges can also start a new campaign
 using the code in the private testing instructions.
 
@@ -88,7 +91,7 @@ Details and every intermediate number are in [DEVLOG.md](DEVLOG.md).
 
 ## Why a measurement tool, not a chatbot
 
-- **Adaptive attacks.** Static templates are weak. Sieve runs an iterative
+- **Adaptive attacks.** Static templates are weak. Turncoat runs an iterative
   refinement loop inspired by TAP (arXiv [2606.10525](https://arxiv.org/abs/2606.10525)),
   without TAP's tree search or pruning: one candidate per attempt, rotating six
   techniques, and the attacker is told how far its last attempt got before it
@@ -164,7 +167,7 @@ What worked and what didn't: [FRICTION_LOG.md](FRICTION_LOG.md).
 ## Quickstart (under 5 minutes)
 
 ```bash
-git clone https://github.com/Nataniel0212/sieve && cd sieve
+git clone https://github.com/Nataniel0212/turncoat && cd turncoat
 pip install -r requirements-dev.txt
 pytest -q                          # offline tests, no key, no network
 python run.py --scenario bank      # offline dry-run of the full pipeline
@@ -283,7 +286,7 @@ because the default rules do not recognise that format.
 
 ## Model licenses
 
-Sieve calls these models through the Token Factory API and does not redistribute
+Turncoat calls these models through the Token Factory API and does not redistribute
 weights.
 
 | Model | License |
@@ -293,7 +296,7 @@ weights.
 
 ## Scope of use
 
-Sieve attacks only agents you own or are authorized to test, using fully
+Turncoat attacks only agents you own or are authorized to test, using fully
 synthetic fixtures. It is a defensive tool: find the hole before an attacker does.
 
 ## Roadmap
