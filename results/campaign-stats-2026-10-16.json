@@ -1,0 +1,11 @@
+{
+  "nvidia/Nemotron-3_5-Lightning": {
+    "campaigns": 60,
+    "median_cost_usd": 0.0112,
+    "median_model_time_s": 14.58,
+    "median_cost_per_attempt_usd": 0.00244,
+    "median_attacker_call_s": 1.72,
+    "median_target_call_s": 0.41,
+    "total_cost_usd": 1.0086
+  }
+}

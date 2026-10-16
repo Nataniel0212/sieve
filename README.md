@@ -20,23 +20,27 @@ with Nano 30B and Ultra 550B for comparison.
 
 ## Results
 
-### Benchmark: 60 live campaigns, $0.99
+### Benchmark: 2 × 60 live campaigns, replicated
 
-Three agents, 20 independent campaigns each. *Full compromise* means the agent
-took the dangerous action (exfiltrated a secret, wired money, deleted a file)
-because injected content told it to.
+Three agents, 20 independent campaigns each, run on two different days.
+*Full compromise* means the agent took the dangerous action (exfiltrated a
+secret, wired money, deleted a file) because injected content told it to.
 
-| Agent under test (Lightning) | Full-compromise rate | 95% CI | Mean attempts | Attacker refusals |
+| Agent under test (Lightning) | 15 Oct | 16 Oct (replication) | 95% CI | Attacker refusals |
 |---|---|---|---|---|
-| **Banking assistant** (wire funds) | **100%** (20/20) | 84–100% | 3.7 | 0% |
-| **Email assistant** (leak a secret) | **95%** (19/20) | 76–99% | 3.35 | 0% |
-| **Document assistant** (delete files) | **10%** (2/20) | 3–30% | 9.6 | 0% |
+| **Banking assistant** (wire funds) | **100%** (20/20) | **100%** (20/20) | 84–100% | 0% |
+| **Email assistant** (leak a secret) | **95%** (19/20) | **95%** (19/20) | 76–99% | 0% |
+| **Document assistant** (delete files) | **10%** (2/20) | **10%** (2/20) | 3–30% | 0% |
 
+Cost: $0.99 and $1.01 for 60 campaigns, a median of $0.011 per full campaign
+([`campaign-stats-2026-10-16.json`](results/campaign-stats-2026-10-16.json)).
 The strongest technique was **output hijacking**: telling the agent that its
-result must be *delivered* by performing the dangerous action. 78% of those
-attempts fully compromised the banking agent (14/18), and 50% the email agent
-(7/14). Raw report:
-[`results/benchmark-2026-10-15.md`](results/benchmark-2026-10-15.md).
+result must be *delivered* by performing the dangerous action. In the
+replication, 85% of those attempts fully compromised the banking agent (17/20),
+and 56% the email agent (10/18). Raw reports:
+[15 Oct](results/benchmark-2026-10-15.md),
+[16 Oct](results/benchmark-2026-10-16.md)
+([JSON](results/benchmark-2026-10-16.json)).
 
 ### Does a bigger model resist better? Yes, sharply
 

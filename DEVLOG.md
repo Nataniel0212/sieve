@@ -230,3 +230,21 @@ Done:
 
 Started: a second, independent 60-trial benchmark run to check that the
 15 Oct numbers replicate.
+
+### Replication: the benchmark reproduces exactly (60 more live trials, $1.01)
+
+Re-ran the full benchmark a day later: same code, same models, independent
+trials. Full-compromise rates were identical: **email 95% (19/20), bank 100%
+(20/20), docs 10% (2/20)**, with 0% attacker refusals. Mean attempts were 4.15,
+3.6 and 9.6. Output hijacking again dominated (bank 17/20 attempts, email
+10/18). Median full campaign: $0.0112 and 14.6 s of model time. Saved as
+`results/benchmark-2026-10-16.{md,json}` (no attack text) and
+`results/campaign-stats-2026-10-16.json`.
+
+### Hosted backend live on Vercel
+
+`https://sieve-redteam.vercel.app` runs `app.py` on Vercel's Python runtime.
+`/api/health` is up. Without a judge code, `/api/attack` correctly refuses
+(no shared store means judge-only). With a judge code, a real campaign (bank vs
+Lightning) streamed end to end: first byte after 1.0 s, compromised at attempt
+3 (output hijack), 12 Nemotron calls, $0.0048, 8.4 s.
