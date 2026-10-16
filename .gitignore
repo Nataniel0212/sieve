@@ -23,3 +23,7 @@ compare.html
 compare.fragment.html
 
 .vercel
+
+# Browser verification artifacts
+output/
+.playwright-cli/

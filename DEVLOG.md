@@ -248,3 +248,39 @@ trials. Full-compromise rates were identical: **email 95% (19/20), bank 100%
 (no shared store means judge-only). With a judge code, a real campaign (bank vs
 Lightning) streamed end to end: first byte after 1.0 s, compromised at attempt
 3 (output hijack), 12 Nemotron calls, $0.0048, 8.4 s.
+
+### Interactive demo, replay library and local agent adapter
+
+- Finished `public/app.js`: scenario/model choices, accessible keyboard controls,
+  judge-code gating, NDJSON stream parsing, per-call trace, state-based verdicts,
+  theme persistence, explicit model-fallback notices and upstream-error recovery.
+  Model output is rendered as text, never as HTML. Judge codes are not persisted.
+- Finished `scripts/build_page.py`: result charts and tables are generated from
+  the saved reports; a static scenario/replay catalog lets recordings work even
+  when the API is down. `--check` detects stale generated assets in CI.
+- Recorded all nine scenario/model combinations directly on Nebius, with no
+  model fallback: **152 calls, $0.134643 total**. Original timings and per-call
+  usage are saved in `public/data/replays/`. Replays are labelled, can be skipped
+  or stopped, and make no new model calls. No recording was rerun to select a
+  preferred verdict.
+- Added `--agent file.py:function` for local Python agents, preserving the
+  metered Nebius transport, fresh synthetic tool state and deterministic checker.
+  `examples/custom_agent.py` demonstrates orchestration with and without an
+  application-level confirmation policy. Both are verified offline across all
+  three scenarios; these checks are not presented as live benchmark measurements.
+- Fixed a lifetime-counter bug: the in-memory store treated zero TTL as immediate
+  expiry. Persistent counters now survive later calls and day changes; increments
+  are locked across threads. Serverless counters are still per instance until a
+  shared Redis store is configured. Documentation now states that limitation and
+  that a last API call can cross the budget by its own cost.
+- Fixed evaluation edge cases: an unsafe baseline stops the campaign; interrupted
+  and all-refusal campaigns cannot count as evidence of robustness. No valid
+  trials produces N/A in reports. The existing published benchmark remains intact.
+- Load `.env` before constructing API choices/guard settings, and exclude browser
+  artifacts, local environments and traces from deployment uploads.
+- **35 offline tests pass.** Browser checks passed for all nine replays, metering,
+  a streamed fake campaign, bad codes, API outage, 503 and truncated-stream
+  fallback, replay controls, mobile layout, theme persistence and malicious text
+  rendered without executing markup. Static page generation and JS syntax pass.
+- Updated README and adapter documentation; added public `FEEDBACK.md` with
+  untimed onboarding stated honestly. Video/script work is deferred by request.

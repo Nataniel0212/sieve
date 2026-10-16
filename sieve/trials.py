@@ -34,7 +34,7 @@ def _empty_result(scenario, reason: str) -> dict:
                        "reasoning_tokens": 0, "latency_s": 0.0, "cost_usd": 0.0}}
 
 
-def run_trials(client, cfg, scenario, trials: int, runs_dir: str = "runs") -> dict:
+def run_trials(client, cfg, scenario, trials: int, runs_dir: str = "runs", target_runner=None) -> dict:
     spent = 0.0
     per: list[dict] = []
     results: list[tuple[str, dict]] = []
@@ -44,11 +44,12 @@ def run_trials(client, cfg, scenario, trials: int, runs_dir: str = "runs") -> di
         if remaining <= 0.002:
             break
         res = loop.run_spike(client, replace(cfg, budget_usd=remaining), scenario,
-                             runs_dir=runs_dir)
+                             runs_dir=runs_dir, target_runner=target_runner)
         cost = res["totals"]["cost_usd"]
         spent += cost
         top = _top_status(res)
         per.append({"trial": i + 1, "top_status": top,
+                    "valid": loop.valid_campaign(res),
                     "attempts": res["attempts_run"], "cost": cost,
                     "run_dir": res["run_dir"]})
         results.append((top, res))
@@ -56,14 +57,14 @@ def run_trials(client, cfg, scenario, trials: int, runs_dir: str = "runs") -> di
     best = min(results, key=lambda tr: _sev_idx(tr[0]))[1] if results \
         else _empty_result(scenario, "budget")
 
-    counts = Counter(p["top_status"] for p in per)
-    n = len(per)
+    counts = Counter(p["top_status"] for p in per if p["valid"])
+    n = sum(p["valid"] for p in per)
     rates = {
         "critical": (counts.get("critical", 0) / n) if n else 0.0,
         "compromise": (sum(v for k, v in counts.items() if k != "safe") / n) if n else 0.0,
     }
     best["aggregate"] = {
-        "trials": n, "rates": rates, "status_counts": dict(counts),
+        "trials": len(per), "valid_trials": n, "rates": rates, "status_counts": dict(counts),
         "per_trial": per, "total_cost": round(spent, 6),
         "total_attempts": sum(p["attempts"] for p in per),
     }

@@ -100,3 +100,24 @@ def test_kill_switch(monkeypatch):
     with pytest.raises(Denied) as e:
         g.reserve("judge-123", "x")
     assert e.value.code == "live_disabled"
+
+
+def test_lifetime_counter_has_no_expiry(monkeypatch):
+    clock = [100.0]
+    monkeypatch.setattr("sieve.guard.time.time", lambda: clock[0])
+    store = MemoryStore()
+    store.incr("lifetime", 0.1, 0)
+    clock[0] += 3600
+    assert store.get("lifetime") == pytest.approx(0.1)
+    store.incr("lifetime", 0.1, 0)
+    clock[0] += 86400
+    assert store.get("lifetime") == pytest.approx(0.2)
+
+
+def test_lifetime_cap_survives_new_day(monkeypatch):
+    g = Guard(SharedMemory(), limits(daily_total=1, lifetime_total=0.15))
+    g.reserve("judge-123", "x")
+    monkeypatch.setattr("sieve.guard._day", lambda: "20990101")
+    with pytest.raises(Denied) as err:
+        g.reserve("judge-123", "x")
+    assert err.value.code == "budget"

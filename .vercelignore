@@ -1,13 +1,17 @@
-# Never upload secrets or local run data to Vercel.
 .env
 .env.*
-!.env.example
-runs/
-runs_test/
-__pycache__/
-.pytest_cache/
-.venv/
+.git
+.pytest_cache
+.venv
+.playwright-cli
+__pycache__
+**/__pycache__
+runs
+runs_test
+output
+tests
+docs
+examples
 report.*
-benchmark.md
-benchmark.html
-compare.html
+benchmark.*
+compare.*

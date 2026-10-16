@@ -24,6 +24,7 @@ from sieve import scenarios  # noqa: E402
 from sieve.config import Config  # noqa: E402
 from sieve.loop import run_spike  # noqa: E402
 from sieve.nebius import LiveClient  # noqa: E402
+from sieve.replays import public_recording  # noqa: E402
 
 
 def main() -> None:
@@ -37,7 +38,7 @@ def main() -> None:
     cfg = Config.from_env(live=True)
     cfg.require_live_ready()
     cfg = replace(cfg, model_target=TARGETS[args.target][1],
-                  max_attempts=args.attempts, budget_usd=args.budget)
+                  max_attempts=args.attempts, budget_usd=args.budget, model_fallback="")
     scn = scenarios.get(args.scenario)
 
     events: list[dict] = []
@@ -50,7 +51,11 @@ def main() -> None:
            "models": {"attacker": cfg.model_attacker, "target": cfg.model_target},
            "events": events}
     dest = ROOT / "public" / "data" / "replays" / f"{args.scenario}-{args.target}.json"
-    dest.write_text(json.dumps(out, ensure_ascii=False), encoding="utf-8")
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    published = json.dumps(public_recording(out), ensure_ascii=False)
+    if cfg.api_key in published:
+        raise RuntimeError("Refusing to publish a recording containing the configured API key")
+    dest.write_text(published, encoding="utf-8")
     print(f"{args.scenario}/{args.target}: {res['stopped_reason']}, "
           f"{res['attempts_run']} attempts, ${res['totals']['cost_usd']:.4f} -> {dest}")
 

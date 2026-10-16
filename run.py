@@ -32,7 +32,15 @@ def main() -> None:
                     help="run N times and report an attack-success rate")
     ap.add_argument("--benchmark", action="store_true",
                     help="run N trials per scenario with statistics (uses --trials)")
+    ap.add_argument("--agent", help="trusted local Python adapter: path/to/agent.py:run_agent")
     args = ap.parse_args()
+    target_runner = None
+    if args.agent:
+        from sieve.adapters import load_adapter
+        try:
+            target_runner = load_adapter(args.agent)
+        except (ValueError, TypeError) as exc:
+            ap.error(str(exc))
 
     cfg = Config.from_env(live=args.live, max_attempts=args.attempts,
                           budget_usd=args.budget)
@@ -51,7 +59,7 @@ def main() -> None:
     if args.benchmark:
         from sieve import benchmark, benchmark_html
         bench = benchmark.run_benchmark(make_client, cfg, list(scenarios.REGISTRY),
-                                        trials_per=args.trials)
+                                        trials_per=args.trials, target_runner=target_runner)
         bench["mode"] = mode
         bench["models"] = {"attacker": cfg.model_attacker, "target": cfg.model_target}
 
@@ -71,9 +79,9 @@ def main() -> None:
     client = make_client(scn)
     if args.trials and args.trials > 1:
         from sieve.trials import run_trials
-        result = run_trials(client, cfg, scn, args.trials)
+        result = run_trials(client, cfg, scn, args.trials, target_runner=target_runner)
     else:
-        result = run_spike(client, cfg, scn)
+        result = run_spike(client, cfg, scn, target_runner=target_runner)
     result["mode"] = mode
     result["models"] = {"attacker": cfg.model_attacker, "target": cfg.model_target}
 

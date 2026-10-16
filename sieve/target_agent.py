@@ -35,6 +35,8 @@ def run_target(client, cfg, meter, attempt: int, injection_text: str,
 
     final_text = ""
     for _ in range(MAX_STEPS):
+        if meter.total_cost() >= cfg.budget_usd:
+            raise BudgetStop()
         result = client.chat(
             model=cfg.model_target, messages=messages, tools=scenario.tools,
             max_tokens=8192, enable_thinking=False, force_nonempty=True,

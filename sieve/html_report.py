@@ -151,6 +151,10 @@ def _body(result: dict) -> str:
     models = result.get("models", {})
     scn = result.get("scenario", {})
     vtext, vclass = _verdict(counts)
+    if result.get("baseline_safe") is not True or result.get("stopped_reason") not in ("max_attempts", "critical_found"):
+        vtext, vclass = "INCOMPLETE — no robustness conclusion", "med"
+    elif result.get("valid_trial") is False:
+        vtext, vclass = "INCONCLUSIVE — no real attack completed", "med"
     mode_label = "LIVE · NEBIUS TOKEN FACTORY" if mode == "live" else "DRY-RUN · OFFLINE"
 
     if result.get("baseline_safe") is True:
@@ -164,10 +168,11 @@ def _body(result: dict) -> str:
     note = ""
     if agg:
         r = agg["rates"]
+        valid = agg.get("valid_trials", agg["trials"])
         tiles = "".join([
-            _tile("full-compromise rate", f"{r['critical'] * 100:.0f}%"),
-            _tile("any compromise", f"{r['compromise'] * 100:.0f}%"),
-            _tile("trials", str(agg["trials"])),
+            _tile("full-compromise rate", f"{r['critical'] * 100:.0f}%" if valid else "N/A"),
+            _tile("any compromise", f"{r['compromise'] * 100:.0f}%" if valid else "N/A"),
+            _tile("valid / all trials", f"{valid}/{agg['trials']}"),
             _tile("total cost", f"${agg['total_cost']:.4f}"),
         ])
         chips = "".join(
@@ -176,8 +181,8 @@ def _body(result: dict) -> str:
             for p in agg["per_trial"])
         note = ('<div class="scen">Attack success is stochastic, so this is a rate '
                 'over independent trials. The strongest trial is shown below.</div>')
-        sub_extra = (f" · {r['critical'] * 100:.0f}% full-compromise over "
-                     f"{agg['trials']} trials")
+        sub_extra = (f" · {r['critical'] * 100:.0f}% full-compromise over {valid} valid trials"
+                     if valid else " · rates N/A: no valid trials")
     else:
         tiles = "".join([
             _tile("attack attempts", str(result.get("attempts_run", 0))),
@@ -199,7 +204,7 @@ def _body(result: dict) -> str:
         findings_html = f'<h2 class="section">Findings — most severe first</h2>{cards}'
     else:
         findings_html = ('<h2 class="section">Findings</h2><div class="scen">No '
-                         'injection changed the agent\'s behaviour within the limit.</div>')
+                         'completed finding recorded. Check the stop reason and baseline before drawing conclusions.</div>')
 
     return f"""<div class="wrap">
 <header>
@@ -213,7 +218,7 @@ def _body(result: dict) -> str:
   <span class="dot"></span>
   <div style="min-width:0">
     <h1>{_esc(vtext)}</h1>
-    <div class="sub">{_esc(baseline)} · stopped: {_esc(result.get('stopped_reason', ''))}{_esc(sub_extra)}</div>
+    <div class="sub">{_esc(baseline)} · stopped: {_esc(result.get('stopped_reason', ''))}{_esc(sub_extra)} · agent: {_esc(result.get('agent_adapter', 'built-in'))}</div>
   </div>
 </div>
 

@@ -118,6 +118,10 @@ def _exceedance_chart(scenarios: list) -> str:
             bx = _xpct(e["p"])
             body.append(f'<text x="{X0 - 10}" y="{mid + 4:.1f}" text-anchor="end" '
                         f'font-size="11">{label}</text>')
+            if not e["n"]:
+                body.append(f'<text x="{X0 + 8}" y="{mid + 4:.1f}" font-size="11">N/A — no valid trials</text>')
+                y += row_h
+                continue
             body.append(f'<rect x="{X0}" y="{mid - 7:.1f}" width="{max(0, bx - X0):.1f}" '
                         f'height="14" rx="3" fill="var(--heat)" fill-opacity="{opacity}">'
                         f'<title>{_esc(s["title"])} · {label}: {e["p"]*100:.1f}% '
@@ -177,6 +181,10 @@ def _table(scenarios: list) -> str:
             "<th>refused</th></tr>"]
     for s in scenarios:
         c = s["exceedance"]
+        if not c["critical"]["n"]:
+            rows.append(f'<tr><td>{_esc(s["title"])}</td><td colspan="4">N/A — no valid trials</td>'
+                        f'<td>0/{s["trials"]}</td><td>{s.get("attacker_refusal_rate", 0)*100:.0f}%</td></tr>')
+            continue
         rows.append(
             f'<tr><td>{_esc(s["title"])}</td>'
             f'<td>{c["medium"]["p"]*100:.0f}%</td>'
@@ -214,7 +222,8 @@ def _body(bench: dict) -> str:
 Wilson confidence interval. Target <b>{_esc(models.get('target', '?'))}</b>,
 attacker <b>{_esc(models.get('attacker', '?'))}</b>. A trial is one adaptive
 campaign; success is checked against the agent's actual actions. Generated
-{_esc(bench.get('generated', ''))}. Synthetic data only.</p>
+{_esc(bench.get('generated', ''))}. Synthetic data only.
+Agent adapter: {_esc(bench.get('agent_adapter', 'built-in'))}.</p>
 
 <div class="tiles">{tiles}</div>
 
@@ -222,7 +231,7 @@ campaign; success is checked against the agent's actual actions. Generated
 <p class="cap">For each agent, the probability a single attack campaign reaches at
 least each severity level (whiskers = 95% CI). The attacker model sometimes
 refuses to write a payload; rates use only valid trials (≥ 1 real attack), and
-refusal rates are in the table.</p>
+refusal rates are in the table. Incomplete campaigns and unsafe baselines are excluded.</p>
 <div class="card">
   <div class="legend">{legend}</div>
   {_exceedance_chart(bench["scenarios"])}

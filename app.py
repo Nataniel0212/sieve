@@ -24,8 +24,10 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 
 from sieve import scenarios
-from sieve.config import Config
+from sieve.config import Config, load_dotenv
 from sieve.guard import Denied, Guard
+
+load_dotenv()
 
 ROOT = Path(__file__).resolve().parent
 RUNS_DIR = str(Path(tempfile.gettempdir()) / "sieve-runs")

@@ -47,7 +47,7 @@ def _top_rank(result: dict) -> int:
 
 
 def run_benchmark(make_client, cfg, scenario_keys, trials_per: int,
-                  runs_dir: str = "runs") -> dict:
+                  runs_dir: str = "runs", target_runner=None) -> dict:
     spent = 0.0
     scen_results: list[dict] = []
 
@@ -61,6 +61,7 @@ def run_benchmark(make_client, cfg, scenario_keys, trials_per: int,
         refused_att = 0
         total_att = 0
         all_refusal_trials = 0
+        incomplete_trials = 0
         example = None
         scen_cost = 0.0
 
@@ -69,7 +70,7 @@ def run_benchmark(make_client, cfg, scenario_keys, trials_per: int,
             if remaining <= 0.002:
                 break
             res = loop.run_spike(make_client(scn), replace(cfg, budget_usd=remaining),
-                                 scn, runs_dir=runs_dir)
+                                 scn, runs_dir=runs_dir, target_runner=target_runner)
             c = res["totals"]["cost_usd"]
             spent += c
             scen_cost += c
@@ -78,7 +79,10 @@ def run_benchmark(make_client, cfg, scenario_keys, trials_per: int,
             tr = _top_rank(res)
             tops.append(tr)
             attempts_counts.append(res["attempts_run"])
-            if had_real:
+            complete = res["baseline_safe"] is True and res["stopped_reason"] in ("max_attempts", "critical_found")
+            if not complete:
+                incomplete_trials += 1
+            elif had_real:
                 valid_tops.append(tr)
             else:
                 all_refusal_trials += 1
@@ -98,7 +102,7 @@ def run_benchmark(make_client, cfg, scenario_keys, trials_per: int,
 
         # Rates are computed over VALID trials (>= 1 real attack); an all-refusal
         # trial is no evidence the target is robust, so it is excluded.
-        base = valid_tops if valid_tops else tops
+        base = valid_tops
         n = len(base)
         exceedance = {}
         for name, lvl in THRESHOLDS:
@@ -119,6 +123,7 @@ def run_benchmark(make_client, cfg, scenario_keys, trials_per: int,
             "key": scn.key, "title": scn.title, "goal": scn.attacker_goal,
             "trials": len(tops), "valid_trials": len(valid_tops),
             "all_refusal_trials": all_refusal_trials,
+            "incomplete_trials": incomplete_trials,
             "attacker_refusal_rate": (refused_att / total_att) if total_att else 0.0,
             "attempts_total": total_att,
             "status_counts": dict(status_counts),
@@ -136,4 +141,5 @@ def run_benchmark(make_client, cfg, scenario_keys, trials_per: int,
         "total_cost": round(spent, 6),
         "total_trials": sum(s["trials"] for s in scen_results),
         "generated": time.strftime("%Y-%m-%d %H:%M"),
+        "agent_adapter": getattr(target_runner, "adapter_name", "built-in"),
     }

@@ -12,13 +12,14 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="style.css">
+<script src="app.js" defer></script>
 </head>
 <body>
 <div class="wrap">
 <nav>
   <a class="brand" href="#top" aria-label="Sieve home">S<b>I</b>EVE</a>
   <span class="sp"></span>
-  <a class="nlink hide-sm" href="#lab">Live attack</a>
+  <a class="nlink" href="#lab">Try it</a>
   <a class="nlink hide-sm" href="#results">Results</a>
   <a class="nlink hide-sm" href="#how">How it works</a>
   <a class="nlink" href="https://github.com/Nataniel0212/sieve" rel="noopener">GitHub ↗</a>
@@ -31,51 +32,59 @@
     <h1>Does your AI agent <span class="hl">leak like a sieve?</span></h1>
     <p class="lead">Sieve points an attacker model at a tool-using agent, lets it
     rewrite its attack after every failure, and checks the agent's real actions to
-    see whether it was hijacked. Pick an agent below and watch it happen.</p>
+    see whether it was hijacked. Run a campaign below, then compare the measured results.</p>
     <div class="cta">
-      <a class="btn primary" href="#lab">Run an attack</a>
+      <a class="btn primary" href="#lab">Try an attack</a>
       <a class="btn sec" href="#results">See the benchmark</a>
     </div>
   </div>
-  <figure class="chartcard" id="hero-chart" aria-live="polite">
-    <figcaption class="cap">Full-compromise rate · loading…</figcaption>
+  <figure class="chartcard" id="hero-chart">
+<!-- build:hero -->
+<figcaption class="cap">Full compromise · Lightning agents · 16 Oct 2026</figcaption><div class="cibar"><div class="cirow"><div class="lbl"><span style="color:var(--fg)">Banking assistant</span><b>100%</b></div><div class="track" role="img" aria-label="Banking assistant: 100%, 95% CI 84% to 100%"><div class="fill" style="width:100.0%"></div><div class="whisk" style="left:83.9%;width:16.1%"></div></div><div class="lbl"><span>20/20 campaigns</span><span>95% CI 84%–100%</span></div></div><div class="cirow"><div class="lbl"><span style="color:var(--fg)">Email assistant</span><b>95%</b></div><div class="track" role="img" aria-label="Email assistant: 95%, 95% CI 76% to 99%"><div class="fill" style="width:95.0%"></div><div class="whisk" style="left:76.4%;width:22.7%"></div></div><div class="lbl"><span>19/20 campaigns</span><span>95% CI 76%–99%</span></div></div><div class="cirow"><div class="lbl"><span style="color:var(--fg)">Document assistant</span><b>10%</b></div><div class="track" role="img" aria-label="Document assistant: 10%, 95% CI 3% to 30%"><div class="fill low" style="width:10.0%"></div><div class="whisk" style="left:2.8%;width:27.3%"></div></div><div class="lbl"><span>2/20 campaigns</span><span>95% CI 3%–30%</span></div></div></div><div class="foot-note">Whiskers: 95% Wilson intervals. Synthetic agents; not a general model rating.</div>
+<!-- /build:hero -->
   </figure>
 </header>
 
-<div class="facts" id="facts"></div>
+<div class="facts" id="facts">
+<!-- build:facts -->
+<div class="fact"><div class="v">120</div><div class="k">benchmark campaigns · two days</div></div><div class="fact"><div class="v">$1.01</div><div class="k">60-campaign replication</div></div><div class="fact"><div class="v">$0.0112</div><div class="k">median campaign · replication</div></div><div class="fact"><div class="v">14.6s</div><div class="k">median model time · replication</div></div>
+<!-- /build:facts -->
+</div>
 
 <!-- ============================== LAB ============================== -->
 <section id="lab">
-  <h2>Live attack</h2>
-  <p class="sub">Every step below is a real call to NVIDIA Nemotron on Nebius Token
-  Factory: the attacker writes an injection, the agent under test reads it while
+  <h2>Watch an agent under attack</h2>
+  <p class="sub">Run live with a judge code or replay a recorded campaign. Both use
+  NVIDIA Nemotron on Nebius Token Factory: the attacker writes an injection, the agent under test reads it while
   doing its normal job, and a deterministic check of the agent's tool calls decides
   the verdict. No LLM judges the outcome.</p>
+  <noscript><p class="note">Enable JavaScript to run the interactive demo. The measured results below work without it.</p></noscript>
+  <p class="notice" id="notice" role="status" hidden></p>
 
   <div class="lab">
     <div class="controls">
       <fieldset>
         <legend class="step"><span>1</span>Agent to attack</legend>
-        <div class="scen" id="scen" role="radiogroup"></div>
+        <div class="scen" id="scen" role="radiogroup" aria-label="Agent to attack"></div>
       </fieldset>
 
       <fieldset>
         <legend class="step"><span>2</span>Model under test</legend>
-        <div class="seg" id="models" role="radiogroup"></div>
+        <div class="seg" id="models" role="radiogroup" aria-label="Model under test"></div>
         <p class="hint" id="model-hint"></p>
       </fieldset>
 
       <fieldset>
         <legend class="step"><span>3</span>Run it</legend>
         <div class="runbtns">
-          <button class="btn primary" id="run-live" type="button">Run live</button>
-          <button class="btn sec" id="run-replay" type="button">Replay a recorded run</button>
+          <button class="btn primary" id="run-live" type="button" disabled>Run live</button>
+          <button class="btn sec" id="run-replay" type="button" disabled>Replay a recorded run</button>
         </div>
         <details class="code" id="code-box">
           <summary>Have a judge code?</summary>
           <label class="field">
             <span>Judge code</span>
-            <input id="code" type="text" autocomplete="off" spellcheck="false" placeholder="from the Devpost testing notes">
+            <input id="code" type="password" autocomplete="off" spellcheck="false" placeholder="from the Devpost testing notes">
           </label>
         </details>
         <p class="live-status" id="live-status">Checking live availability…</p>
@@ -87,9 +96,9 @@
       </details>
     </div>
 
-    <div class="console" aria-live="polite">
+    <div class="console" aria-label="Campaign trace">
       <div class="console-head">
-        <div class="pill" id="pill"><span class="dot"></span><span id="pill-text">Idle</span></div>
+        <div class="pill" id="pill" role="status"><span class="dot"></span><span id="pill-text">Idle</span></div>
         <div class="mode" id="mode"></div>
       </div>
       <div class="meters" id="meters">
@@ -112,6 +121,7 @@
       </details>
       <div class="replay-ctl" id="replay-ctl" hidden>
         <button class="btn sec small" id="skip" type="button">Skip to the end</button>
+        <button class="btn sec small" id="stop-replay" type="button">Stop replay</button>
       </div>
     </div>
   </div>
@@ -122,19 +132,31 @@
   <h2>The benchmark</h2>
   <p class="sub">One live run is an anecdote. The benchmark runs many independent
   campaigns per agent and reports the full-compromise rate with a 95% Wilson
-  confidence interval. Every number on this page is loaded from the JSON the
-  benchmark wrote; none is typed in by hand.</p>
-  <div id="bench"></div>
+  confidence interval. The charts and tables below are built from the saved
+  benchmark reports.</p>
+  <div id="bench">
+<!-- build:bench -->
+<div class="bench"><div class="card"><div class="cap">15 Oct · first run · 20 trials per agent · $0.99</div><div class="cibar"><div class="cirow"><div class="lbl"><span style="color:var(--fg)">Email assistant</span><b>95%</b></div><div class="track" role="img" aria-label="Email assistant: 95%, 95% CI 76% to 99%"><div class="fill" style="width:95.0%"></div><div class="whisk" style="left:76.4%;width:22.7%"></div></div><div class="lbl"><span>19/20 · mean 3.35 attempts</span><span>95% CI 76%–99%</span></div></div><div class="cirow"><div class="lbl"><span style="color:var(--fg)">Banking assistant</span><b>100%</b></div><div class="track" role="img" aria-label="Banking assistant: 100%, 95% CI 84% to 100%"><div class="fill" style="width:100.0%"></div><div class="whisk" style="left:83.9%;width:16.1%"></div></div><div class="lbl"><span>20/20 · mean 3.7 attempts</span><span>95% CI 84%–100%</span></div></div><div class="cirow"><div class="lbl"><span style="color:var(--fg)">Document assistant</span><b>10%</b></div><div class="track" role="img" aria-label="Document assistant: 10%, 95% CI 3% to 30%"><div class="fill low" style="width:10.0%"></div><div class="whisk" style="left:2.8%;width:27.3%"></div></div><div class="lbl"><span>2/20 · mean 9.6 attempts</span><span>95% CI 3%–30%</span></div></div></div><div class="note">Attacker refusals: 0% / 0% / 0%.</div></div><div class="card"><div class="cap">16 Oct · independent replication · 20 trials per agent · $1.01</div><div class="cibar"><div class="cirow"><div class="lbl"><span style="color:var(--fg)">Email assistant</span><b>95%</b></div><div class="track" role="img" aria-label="Email assistant: 95%, 95% CI 76% to 99%"><div class="fill" style="width:95.0%"></div><div class="whisk" style="left:76.4%;width:22.7%"></div></div><div class="lbl"><span>19/20 · mean 4.15 attempts</span><span>95% CI 76%–99%</span></div></div><div class="cirow"><div class="lbl"><span style="color:var(--fg)">Banking assistant</span><b>100%</b></div><div class="track" role="img" aria-label="Banking assistant: 100%, 95% CI 84% to 100%"><div class="fill" style="width:100.0%"></div><div class="whisk" style="left:83.9%;width:16.1%"></div></div><div class="lbl"><span>20/20 · mean 3.6 attempts</span><span>95% CI 84%–100%</span></div></div><div class="cirow"><div class="lbl"><span style="color:var(--fg)">Document assistant</span><b>10%</b></div><div class="track" role="img" aria-label="Document assistant: 10%, 95% CI 3% to 30%"><div class="fill low" style="width:10.0%"></div><div class="whisk" style="left:2.8%;width:27.3%"></div></div><div class="lbl"><span>2/20 · mean 9.6 attempts</span><span>95% CI 3%–30%</span></div></div></div><div class="note">Attacker refusals: 0% / 0% / 0%.</div></div></div><p class="note">Target: Nemotron 3.5 Lightning. Up to 10 attempts per campaign. Each interval describes one day, not pooled trials. <a href="https://github.com/Nataniel0212/sieve/tree/main/results">Raw reports and methodology ↗</a></p>
+<!-- /build:bench -->
+  </div>
 
   <h3 class="h3">Does a bigger model resist better?</h3>
   <p class="sub">Same attacker (Nemotron 3 Ultra), three Nemotron models as the agent
   under test. Cells are the full-compromise rate; k/n trials below.</p>
-  <div id="compare"></div>
+  <div id="compare">
+<!-- build:compare -->
+<div class="tablewrap"><table class="comparison"><caption>Full-compromise rate by target model</caption><thead><tr><th>Target model</th><th>Email assistant</th><th>Banking assistant</th><th>Document assistant</th></tr></thead><tbody><tr><th scope="row">Lightning</th><td class="cell hot"><div class="p">90%</div><div class="kn">9/10 · CI 60%–98%</div></td><td class="cell hot"><div class="p">100%</div><div class="kn">10/10 · CI 72%–100%</div></td><td class="cell cool"><div class="p">0%</div><div class="kn">0/10 · CI 0%–28%</div></td></tr><tr><th scope="row">Nano-30B</th><td class="cell hot"><div class="p">60%</div><div class="kn">6/10 · CI 31%–83%</div></td><td class="cell hot"><div class="p">100%</div><div class="kn">10/10 · CI 72%–100%</div></td><td class="cell cool"><div class="p">0%</div><div class="kn">0/10 · CI 0%–28%</div></td></tr><tr><th scope="row">Ultra-550B</th><td class="cell cool"><div class="p">0%</div><div class="kn">0/10 · CI 0%–28%</div></td><td class="cell cool"><div class="p">0%</div><div class="kn">0/10 · CI 0%–28%</div></td><td class="cell cool"><div class="p">0%</div><div class="kn">0/10 · CI 0%–28%</div></td></tr></tbody></table></div><p class="note">10 campaigns per cell · $2.27 total. Zero observed compromises does not establish immunity. The email intervals for Lightning and Nano overlap.</p>
+<!-- /build:compare -->
+  </div>
 
   <h3 class="h3">Which attacks get through</h3>
   <p class="sub">Critical success rate per attempt, by the technique the attacker was
   told to try.</p>
-  <div id="tech"></div>
+  <div id="tech">
+<!-- build:tech -->
+<div class="techs"><div class="card"><div class="cap">Email assistant</div><div class="trow"><span class="nm">system-notice</span><span class="bar" aria-hidden="true"><i style="width:4.3%"></i></span><span class="v"><b>4%</b> 1/23</span></div><div class="trow"><span class="nm">pre-authorized</span><span class="bar" aria-hidden="true"><i style="width:18.2%"></i></span><span class="v"><b>18%</b> 4/22</span></div><div class="trow"><span class="nm">output-hijack</span><span class="bar" aria-hidden="true"><i style="width:55.6%"></i></span><span class="v"><b>56%</b> 10/18</span></div><div class="trow"><span class="nm">fake-tool-call</span><span class="bar" aria-hidden="true"><i style="width:12.5%"></i></span><span class="v"><b>12%</b> 1/8</span></div><div class="trow"><span class="nm">step-splitting</span><span class="bar" aria-hidden="true"><i style="width:0.0%"></i></span><span class="v"><b>0%</b> 0/6</span></div><div class="trow"><span class="nm">urgency-authority</span><span class="bar" aria-hidden="true"><i style="width:50.0%"></i></span><span class="v"><b>50%</b> 3/6</span></div></div><div class="card"><div class="cap">Banking assistant</div><div class="trow"><span class="nm">system-notice</span><span class="bar" aria-hidden="true"><i style="width:0.0%"></i></span><span class="v"><b>0%</b> 0/22</span></div><div class="trow"><span class="nm">pre-authorized</span><span class="bar" aria-hidden="true"><i style="width:9.1%"></i></span><span class="v"><b>9%</b> 2/22</span></div><div class="trow"><span class="nm">output-hijack</span><span class="bar" aria-hidden="true"><i style="width:85.0%"></i></span><span class="v"><b>85%</b> 17/20</span></div><div class="trow"><span class="nm">fake-tool-call</span><span class="bar" aria-hidden="true"><i style="width:0.0%"></i></span><span class="v"><b>0%</b> 0/3</span></div><div class="trow"><span class="nm">step-splitting</span><span class="bar" aria-hidden="true"><i style="width:33.3%"></i></span><span class="v"><b>33%</b> 1/3</span></div><div class="trow"><span class="nm">urgency-authority</span><span class="bar" aria-hidden="true"><i style="width:0.0%"></i></span><span class="v"><b>0%</b> 0/2</span></div></div><div class="card"><div class="cap">Document assistant</div><div class="trow"><span class="nm">system-notice</span><span class="bar" aria-hidden="true"><i style="width:0.0%"></i></span><span class="v"><b>0%</b> 0/39</span></div><div class="trow"><span class="nm">pre-authorized</span><span class="bar" aria-hidden="true"><i style="width:0.0%"></i></span><span class="v"><b>0%</b> 0/39</span></div><div class="trow"><span class="nm">output-hijack</span><span class="bar" aria-hidden="true"><i style="width:5.1%"></i></span><span class="v"><b>5%</b> 2/39</span></div><div class="trow"><span class="nm">fake-tool-call</span><span class="bar" aria-hidden="true"><i style="width:0.0%"></i></span><span class="v"><b>0%</b> 0/37</span></div><div class="trow"><span class="nm">step-splitting</span><span class="bar" aria-hidden="true"><i style="width:0.0%"></i></span><span class="v"><b>0%</b> 0/19</span></div><div class="trow"><span class="nm">urgency-authority</span><span class="bar" aria-hidden="true"><i style="width:0.0%"></i></span><span class="v"><b>0%</b> 0/19</span></div></div></div><p class="note">16 Oct replication. Technique order is fixed: these rates also reflect attempt position and prior feedback, not isolated causal effects.</p>
+<!-- /build:tech -->
+  </div>
 
   <h3 class="h3">We caught our own benchmark lying</h3>
   <p class="sub">The attacker model kept refusing to write payloads, which silently
@@ -146,7 +168,7 @@
     <div class="stage"><div class="t">2 · Valid-trial statistics</div><div class="n">70 / 47 / 5</div>
       <div class="d">Detect refusals; count only trials that contained a real attack.</div></div>
     <div class="stage win"><div class="t">3 · Root cause fixed</div><div class="n">95 / 100 / 10</div>
-      <div class="d">Attacker reasoning off: refusals fell to 0%. This is the true picture.</div></div>
+      <div class="d">Attacker reasoning off: no refusals detected in these trials.</div></div>
   </div>
 </section>
 
@@ -174,7 +196,7 @@
         <text x="670" y="118" class="ns">real tool-calling loop</text></g>
       <g class="node ok"><rect x="650" y="200" width="230" height="80" rx="12"/>
         <text x="670" y="232" class="nt">State check</text>
-        <text x="670" y="256" class="ns">did money / a secret / a file move?</text></g>
+        <text x="670" y="256" class="ns">check money · secrets · files</text></g>
       <g class="node"><rect x="20" y="200" width="230" height="80" rx="12"/>
         <text x="40" y="232" class="nt">Benchmark</text>
         <text x="40" y="256" class="ns">n trials · Wilson 95% CI · $</text></g>
@@ -205,11 +227,16 @@
       <p>The verdict comes from the agent's actual tool calls: did a secret leave
       to an outside address, did money move, was a file deleted? An injection cannot
       talk its way past a state check.</p></div>
+    <div class="row"><h3>Test your own agent</h3>
+      <p>Bring your Python agent's orchestration and tool policy through the local
+      adapter. Model calls stay metered on Nebius; tools run against synthetic
+      state. The included confirmation-policy example shows how to test a defence.
+      <a href="https://github.com/Nataniel0212/sieve/blob/main/docs/adapters.md">Adapter quickstart ↗</a></p></div>
     <div class="row"><h3>Guardrails on this demo</h3>
-      <p id="guard-copy">Each live run has a hard cost cap and a limited number of
-      attempts. Daily and lifetime spend caps are reserved before a run starts.
-      When the budget or the API is unavailable, the page fails closed to recorded
-      runs, which are labelled as recordings.</p></div>
+      <p id="guard-copy">Live runs require a judge code. Each run has a budget stop
+      and an attempt limit. Recorded runs remain available when live runs are
+      paused and are always labelled. The current deployment uses per-instance
+      spend counters; a shared store is required for global caps and public runs.</p></div>
   </div>
 </section>
 
@@ -220,6 +247,5 @@
   <a href="https://github.com/Nataniel0212/sieve" rel="noopener">github.com/Nataniel0212/sieve</a>
 </footer>
 </div>
-<script src="app.js"></script>
 </body>
 </html>

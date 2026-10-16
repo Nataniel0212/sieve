@@ -16,9 +16,17 @@ jobs:
       - run: pip install -r requirements-dev.txt
       - name: Unit + API tests (offline fakes, no key, no spend)
         run: pytest -q
+      - name: Generated page and replay catalog
+        run: python scripts/build_page.py --check
+      - name: Browser script syntax
+        run: node --check public/app.js
       - name: Dry-run every scenario
         run: |
           for s in inbox bank docs; do python run.py --scenario "$s" > /dev/null; done
+      - name: Custom agent adapter and confirmation policy (offline)
+        run: |
+          python run.py --agent examples/custom_agent.py:run_agent --scenario bank > /dev/null
+          python run.py --agent examples/custom_agent.py:confirmation_agent --scenario bank > /dev/null
   secrets:
     runs-on: ubuntu-latest
     steps:

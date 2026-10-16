@@ -44,6 +44,7 @@ def render_benchmark(bench: dict, mode: str, out_path: str = "benchmark.md") -> 
              f"total cost ${bench['total_cost']:.4f}")
     L.append("- Rates are attack-success probabilities with a 95% Wilson "
              "confidence interval; a trial is one adaptive campaign.")
+    L.append(f"- Agent adapter: {bench.get('agent_adapter', 'built-in')}")
     for s in bench["scenarios"]:
         L.append("")
         L.append(f"## {s['title']} ({s['key']}) — {s['trials']} trials")
@@ -51,11 +52,14 @@ def render_benchmark(bench: dict, mode: str, out_path: str = "benchmark.md") -> 
         L.append(f"Attacker refused {s.get('attacker_refusal_rate', 0)*100:.0f}% of "
                  f"attempts; valid trials (>= 1 real attack): "
                  f"{s.get('valid_trials', s['trials'])}/{s['trials']}. "
-                 f"Rates below use valid trials.")
+                 f"Incomplete trials excluded: {s.get('incomplete_trials', 0)}. Rates below use valid trials.")
         for name in ("medium", "high", "critical"):
             e = s["exceedance"][name]
             lbl = {"medium": "P(>= medium)", "high": "P(>= high)",
                    "critical": "P(critical) "}[name]
+            if not e["n"]:
+                L.append(f"- {lbl}: N/A — no valid completed trials")
+                continue
             L.append(f"- {lbl}: {e['p'] * 100:5.1f}%  "
                      f"[{e['lo'] * 100:4.1f}–{e['hi'] * 100:4.1f}]  ({e['k']}/{e['n']})")
         a = s["attempts"]
@@ -89,18 +93,26 @@ def render(result: dict, mode: str, out_path: str = "report.md") -> str:
     lines.append(f"# Sieve report — {tag}")
     lines.append("")
     lines.append(f"- Scenario: {scn.get('title', '?')} ({scn.get('key', '?')})")
+    lines.append(f"- Agent adapter: {result.get('agent_adapter', 'built-in')}")
     lines.append(f"- Attacker goal: {scn.get('goal', '?')}")
     lines.append(f"- Baseline (benign content) safe: {baseline}")
     lines.append(f"- Attack attempts run: {result['attempts_run']}")
-    lines.append(f"- Verdict: {_verdict(counts)} (stopped: {result['stopped_reason']})")
+    complete = result["baseline_safe"] is True and result["stopped_reason"] in ("max_attempts", "critical_found")
+    observed = _verdict(counts) if complete else "INCOMPLETE — no robustness conclusion"
+    if complete and result.get("valid_trial") is False:
+        observed = "INCONCLUSIVE — no real attack completed"
+    lines.append(f"- Verdict: {observed} (stopped: {result['stopped_reason']})")
 
     agg = result.get("aggregate")
     if agg:
         r = agg["rates"]
-        lines.append(f"- Trials: {agg['trials']} · "
+        if agg.get("valid_trials", agg["trials"]):
+            lines.append(f"- Trials: {agg['trials']} (valid: {agg.get('valid_trials', agg['trials'])}) · "
                      f"full-compromise rate {r['critical'] * 100:.0f}% · "
                      f"any-compromise {r['compromise'] * 100:.0f}% · "
                      f"total ${agg['total_cost']:.4f} over {agg['total_attempts']} attempts")
+        else:
+            lines.append(f"- Trials: {agg['trials']} · rates N/A — no valid completed trials · total ${agg['total_cost']:.4f}")
         lines.append("- Per trial (top severity): " +
                      ", ".join(f"#{p['trial']}:{p['top_status']}" for p in agg["per_trial"]))
     lines.append(f"- Severity breakdown (shown trial): {breakdown}")

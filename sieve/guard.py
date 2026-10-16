@@ -20,6 +20,7 @@ from __future__ import annotations
 import hmac
 import json
 import os
+import threading
 import time
 import urllib.request
 from dataclasses import dataclass
@@ -66,6 +67,7 @@ class MemoryStore:
 
     def __init__(self) -> None:
         self._d: dict[str, tuple[float, float]] = {}  # key -> (value, expires_at)
+        self._lock = threading.Lock()
 
     def _get(self, key: str) -> float:
         v, exp = self._d.get(key, (0.0, 0.0))
@@ -75,13 +77,17 @@ class MemoryStore:
         return v
 
     def get(self, key: str) -> float:
-        return self._get(key)
+        with self._lock:
+            return self._get(key)
 
     def incr(self, key: str, amount: float, ttl_s: int) -> float:
-        v = self._get(key) + amount
-        exp = self._d.get(key, (0.0, time.time() + ttl_s))[1] or time.time() + ttl_s
-        self._d[key] = (v, exp)
-        return v
+        with self._lock:
+            v = self._get(key) + amount
+            # Redis TTL=0 means persistent. Do not expire the lifetime counter
+            # immediately, or extend an existing daily counter on settlement.
+            exp = self._d[key][1] if key in self._d else (time.time() + ttl_s if ttl_s else 0.0)
+            self._d[key] = (v, exp)
+            return v
 
 
 class UpstashStore:

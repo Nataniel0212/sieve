@@ -18,6 +18,10 @@ with Nano 30B and Ultra 550B for comparison.
 > agents you own. Synthetic data only. No real person, account, secret or file
 > exists anywhere in this repo.
 
+**[Open the interactive demo](https://sieve-redteam.vercel.app)** — nine recorded
+live campaigns are available without a code. Judges can also start a new campaign
+using the code in the private testing instructions.
+
 ## Results
 
 ### Benchmark: 2 × 60 live campaigns, replicated
@@ -106,6 +110,7 @@ at *N*, or when the budget guard trips.
 | `sieve/metering.py` | Per-call tokens, latency and cost to JSONL |
 | `sieve/nebius.py` | Token Factory client and Nemotron quirk handling |
 | `sieve/guard.py` | Spend and abuse guard for the hosted demo |
+| `sieve/adapters.py` | Run your own Python agent's orchestration and tool policy |
 | `app.py` | FastAPI web API (streams a live campaign as NDJSON) |
 
 ### Built-in scenarios
@@ -144,7 +149,7 @@ What worked and what didn't: [FRICTION_LOG.md](FRICTION_LOG.md).
 ```bash
 git clone https://github.com/Nataniel0212/sieve && cd sieve
 pip install -r requirements-dev.txt
-pytest -q                          # 24 offline tests, no key, no network
+pytest -q                          # offline tests, no key, no network
 python run.py --scenario bank      # offline dry-run of the full pipeline
 ```
 
@@ -165,6 +170,21 @@ Each run writes a console report, a self-contained `report.html` / `benchmark.ht
 
 ## Web API (hosted demo backend)
 
+The web UI supports scenario/model selection, streamed tool traces, per-call
+metering, dark/light themes and labelled recordings for all nine combinations.
+Replays work even when the live API is down. An upstream live failure offers a
+recording automatically and explains that the meters now refer to the recording.
+An invalid judge code is shown as an error; the code is never stored in the browser.
+
+Static result tables are built from saved benchmark reports. After changing
+results or recording another campaign, rebuild the page and offline catalog:
+
+```bash
+python scripts/record_replay.py --scenario bank --target lightning  # real API calls
+python scripts/build_page.py
+python scripts/build_page.py --check
+```
+
 ```bash
 uvicorn app:app --reload                                 # http://127.0.0.1:8000
 SIEVE_FAKE_LLM=1 DEMO_ACCESS_CODE=dev uvicorn app:app    # offline, no spend
@@ -180,17 +200,36 @@ Token Factory has no spend cap, so the demo's guard (`sieve/guard.py`) **fails
 closed**:
 
 - a kill switch
-- a hard cost cap and attempt limit per run
+- a budget stop between calls and an attempt limit per run (the last API call can
+  cross the budget by its own cost)
 - daily and lifetime caps, *reserved before* a run starts and settled to the real
   metered cost afterwards, so concurrent runs cannot overspend
 - a per-IP hourly limit and a judge code
 
 Without a shared Redis store (Upstash), public runs are off and only judge-code
-runs are allowed. Configuration: `DEMO_*` variables in [`.env.example`](.env.example).
+runs are allowed, with **per-instance** counters that reset on process restart.
+The current deployment uses this judge-only mode; its daily/lifetime counters
+are not global guarantees across serverless instances. Configuration: `DEMO_*`
+variables in [`.env.example`](.env.example).
+
+## Bring your own agent
+
+```bash
+python run.py --scenario bank --agent examples/custom_agent.py:run_agent
+python run.py --scenario bank --agent examples/custom_agent.py:confirmation_agent
+```
+
+Use your own Python orchestration and tool policy while keeping Nebius calls
+metered and actions checked against synthetic state. Both examples run offline
+by default; add `--live` for real calls. The second example requires confirmation
+before sensitive actions. [Adapter guide and full example](docs/adapters.md).
+
+This is a local Python integration, not a remote production-agent connector.
+The published benchmark continues to describe the built-in agents.
 
 ## Tests and CI
 
-`pytest -q` runs 24 offline tests covering:
+`pytest -q` runs offline tests covering:
 
 - the Wilson interval
 - the state-based verdicts
@@ -200,6 +239,10 @@ runs are allowed. Configuration: `DEMO_*` variables in [`.env.example`](.env.exa
 - the spend guard: judge-only fail-closed, pool caps and settlement, IP limits,
   store outage, kill switch
 - the streaming API
+- custom agent orchestration, confirmation policy and invalid baselines
+- exclusion of interrupted/all-refusal campaigns from benchmark rates
+- replay provenance, complete event streams and metering consistency
+- lifetime budget persistence across days
 
 CI runs the tests, a dry-run of every scenario, and a gitleaks secret scan. The
 scan uses an extra rule for Nebius keys ([`.gitleaks.toml`](.gitleaks.toml)),
@@ -207,9 +250,10 @@ because the default rules do not recognise that format.
 
 ## Known limitations
 
-- **Toy agents.** Three synthetic agents with small tool sets. Real agents have
-  larger contexts, more tools and their own defenses. An adapter for external
-  agents is next on the roadmap.
+- **Synthetic scenarios.** The published results use three agents with small
+  tool sets. The local Python adapter can test your orchestration and policy,
+  but still uses synthetic tools. Production-agent and AgentDojo connectors remain
+  future work.
 - **Technique and attempt number are confounded.** Techniques rotate in a fixed
   order, so the per-technique rates also reflect *when* a technique is tried.
 - **Small n for the model comparison** (10 per cell). The intervals are wide; read
@@ -236,7 +280,7 @@ synthetic fixtures. It is a defensive tool: find the hole before an attacker doe
 
 ## Roadmap
 
-- Point Sieve at your **own agent** through an adapter (HTTP or Python).
+- Connect to remote agents and additional real-world evaluation environments.
 - Run **AgentDojo** (MIT) suites for numbers comparable to the literature.
 - Suggest a mitigation per finding and re-measure with it applied.
 
