@@ -311,3 +311,11 @@ def get(key: str) -> Scenario:
     if key not in REGISTRY:
         raise SystemExit(f"Unknown scenario '{key}'. Choices: {', '.join(REGISTRY)}")
     return REGISTRY[key]
+
+
+def public_catalog() -> list[dict]:
+    """What the web UI shows per scenario: served by /api/scenarios and baked
+    into the offline catalog from this one definition."""
+    return [{**s.meta(), "system_prompt": s.system_prompt, "user_task": s.user_task,
+             "tools": [t["function"]["name"] for t in s.tools],
+             "descriptions": s.descriptions} for s in REGISTRY.values()]

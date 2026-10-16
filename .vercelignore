@@ -12,6 +12,8 @@ output
 tests
 docs
 examples
-report.*
-benchmark.*
-compare.*
+# Root-level generated reports only: an unanchored pattern would also drop the
+# source modules sieve/report.py and sieve/benchmark.py from the function.
+/report.*
+/benchmark.*
+/compare.*

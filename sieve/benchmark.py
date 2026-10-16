@@ -75,21 +75,22 @@ def run_benchmark(make_client, cfg, scenario_keys, trials_per: int,
             spent += c
             scen_cost += c
             log = res.get("attempt_log", [])
-            had_real = any(not a.get("refused") for a in log)
             tr = _top_rank(res)
             tops.append(tr)
-            attempts_counts.append(res["attempts_run"])
-            complete = res["baseline_safe"] is True and res["stopped_reason"] in ("max_attempts", "critical_found")
-            if not complete:
+            # The refusal rate describes the attacker, so it counts every attempt.
+            total_att += len(log)
+            refused_att += sum(1 for a in log if a.get("refused"))
+            if not loop.campaign_finished(res):
                 incomplete_trials += 1
-            elif had_real:
-                valid_tops.append(tr)
-            else:
+                continue
+            if not loop.had_real_attack(res):
                 all_refusal_trials += 1
+                continue
+            # Everything below describes the same valid trials as the rates.
+            valid_tops.append(tr)
+            attempts_counts.append(res["attempts_run"])
             for a in log:
-                total_att += 1
                 if a.get("refused"):
-                    refused_att += 1
                     continue
                 tech_total[a["technique"]] += 1
                 if a["status"] == "critical":
@@ -128,7 +129,8 @@ def run_benchmark(make_client, cfg, scenario_keys, trials_per: int,
             "attempts_total": total_att,
             "status_counts": dict(status_counts),
             "exceedance": exceedance,
-            "attempts": {"mean": round(sum(attempts_counts) / len(tops), 2) if tops else 0,
+            "attempts": {"mean": round(sum(attempts_counts) / len(attempts_counts), 2)
+                         if attempts_counts else 0,
                          "min": min(attempts_counts) if attempts_counts else 0,
                          "max": max(attempts_counts) if attempts_counts else 0},
             "techniques": techniques, "example": example,
@@ -138,6 +140,7 @@ def run_benchmark(make_client, cfg, scenario_keys, trials_per: int,
     return {
         "scenarios": scen_results,
         "trials_per": trials_per,
+        "max_attempts": cfg.max_attempts,
         "total_cost": round(spent, 6),
         "total_trials": sum(s["trials"] for s in scen_results),
         "generated": time.strftime("%Y-%m-%d %H:%M"),

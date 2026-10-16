@@ -26,6 +26,7 @@ from pydantic import BaseModel
 from sieve import scenarios
 from sieve.config import Config, load_dotenv
 from sieve.guard import Denied, Guard
+from sieve.targets import web_targets
 
 load_dotenv()
 
@@ -35,16 +36,8 @@ HEARTBEAT_S = 10
 # Offline mode for tests and UI work: the deterministic fakes, no key, no spend.
 FAKE_LLM = os.environ.get("SIEVE_FAKE_LLM") == "1"
 
-# Agent-under-test choices. Ids come from the environment so a renamed model
-# never needs a code change.
-TARGETS = {
-    "lightning": ("Nemotron 3.5 Lightning",
-                  os.environ.get("MODEL_TARGET", "nvidia/Nemotron-3_5-Lightning")),
-    "nano": ("Nemotron 3 Nano 30B",
-             os.environ.get("MODEL_TARGET_NANO", "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B")),
-    "ultra": ("Nemotron 3 Ultra 550B",
-              os.environ.get("MODEL_TARGET_ULTRA", "nvidia/Nemotron-3-Ultra-550b-a55b")),
-}
+# Agent-under-test choices: key -> (label, model id), shared with the catalog.
+TARGETS = web_targets()
 
 app = FastAPI(title="Sieve", docs_url=None, redoc_url=None)
 guard = Guard()
@@ -73,12 +66,7 @@ def health():
 
 @app.get("/api/scenarios")
 def list_scenarios():
-    out = []
-    for s in scenarios.REGISTRY.values():
-        out.append({**s.meta(), "system_prompt": s.system_prompt, "user_task": s.user_task,
-                    "tools": [t["function"]["name"] for t in s.tools],
-                    "descriptions": s.descriptions})
-    return out
+    return scenarios.public_catalog()
 
 
 @app.post("/api/attack")

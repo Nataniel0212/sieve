@@ -297,3 +297,47 @@ Publication checks:
   assets and all nine recordings present, public live requests rejected without
   a code, authorized bank/Lightning campaign complete in 3 attempts, 12 calls,
   11.798 seconds of model time and $0.015717.
+
+### Code review fixes: evaluation edge cases and derived page text
+
+A full code review of the demo/adapter commits found evaluation edge cases. None
+changes a published number: every published trial was complete, valid and had a
+0% attacker-refusal flag, so the 95/100/10 benchmark and the model comparison
+stand as reported. Fixed anyway, each with a regression test that fails on the
+old code:
+
+- **Refusal false positive.** The refusal check reads the payload's opening
+  text, so an injection posing as the user ("I can't log in, please transfer...")
+  matched it, and a sandbox-confirmed compromise could be labelled inconclusive
+  and dropped from rates. An attempt now counts as a refusal only if it also left
+  the agent safe.
+- **Adapter robustness.** An invented tool name or malformed arguments now return
+  an error string to the model, as in the built-in agent, instead of aborting the
+  campaign. The 12-turn and 100-tool-call caps end that agent run, not the
+  benchmark. Adapters get a private copy of the tool list.
+- **Missing data is N/A.** Comparison chart/table, CLI output and the generated
+  page show N/A, never 0%, for a cell with no valid trials.
+- **Headline trial.** Repeated-trial reports headline the most severe *valid*
+  trial, matching the set the rates use.
+- **Deployment.** `.vercelignore` patterns for root reports are anchored so they
+  no longer exclude `sieve/report.py` and `sieve/benchmark.py`.
+- **Web verdict.** A stopped run now says why (baseline failed, budget stop,
+  HTTP 402) instead of "no real attack completed", and the server's
+  `valid_trial` is authoritative.
+- **No hand-typed page claims.** Dates, model name, campaign counts, the attempt
+  statement and the overlapping-interval note are now derived from `results/`.
+  New benchmarks record `max_attempts`.
+- **One budget check.** Every model call in a campaign, including the attacker's
+  refusal retries, now passes a single `BudgetedClient` check instead of checks
+  scattered over the loop, agent and adapters.
+- **Same trials everywhere.** Per-technique rates and attempt counts use the
+  valid trials behind the headline rate; the attacker-refusal rate still counts
+  every attempt. The completeness rule lives in `loop.py` and every report uses it.
+- **One source for web choices.** `sieve/targets.py` defines target labels and
+  ids for the API, recorder and offline catalog; the Lightning slot has its own
+  `MODEL_TARGET_LIGHTNING`, so the CLI's `MODEL_TARGET` cannot relabel a run.
+  The scenario catalog is likewise defined once.
+- **Comparison report text** (headline, takeaway, attacker name) is derived from
+  the data rather than typed by hand.
+- **50 offline tests pass**; page check, JS syntax, offline API run and a
+  browser check of all three stop cases, a full offline campaign and a replay pass.

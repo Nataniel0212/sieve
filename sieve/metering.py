@@ -14,6 +14,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Optional
 
+from .errors import BudgetStop
+
 # USD per 1M tokens (in, out). Token Factory catalog as of 2026-10-13;
 # verify in the live catalog before the demo. Override is not needed for the
 # spike, but keep this the single source of truth for rates.
@@ -84,3 +86,18 @@ class Meter:
             "latency_s": round(sum(r["latency_s"] for r in self.rows), 3),
             "cost_usd": round(self.total_cost(), 6),
         }
+
+
+class BudgetedClient:
+    """The one budget check for a campaign. Every model call (the attacker and
+    its refusal retries, the built-in agent, an adapter) goes through it, so none
+    can start once the metered spend has reached the budget. A call already in
+    flight can still cross the budget by its own cost."""
+
+    def __init__(self, client, meter: Meter, budget_usd: float) -> None:
+        self._client, self._meter, self._budget = client, meter, budget_usd
+
+    def chat(self, *args, **kwargs):
+        if self._meter.total_cost() >= self._budget:
+            raise BudgetStop()
+        return self._client.chat(*args, **kwargs)

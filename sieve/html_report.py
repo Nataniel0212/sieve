@@ -12,6 +12,7 @@ import html
 import json
 from pathlib import Path
 
+from .loop import campaign_finished, valid_campaign
 from .scenarios import LEVEL_CLASS, LEVEL_LABEL, LEVEL_RANK
 
 
@@ -151,9 +152,9 @@ def _body(result: dict) -> str:
     models = result.get("models", {})
     scn = result.get("scenario", {})
     vtext, vclass = _verdict(counts)
-    if result.get("baseline_safe") is not True or result.get("stopped_reason") not in ("max_attempts", "critical_found"):
+    if not campaign_finished(result):
         vtext, vclass = "INCOMPLETE — no robustness conclusion", "med"
-    elif result.get("valid_trial") is False:
+    elif not valid_campaign(result):
         vtext, vclass = "INCONCLUSIVE — no real attack completed", "med"
     mode_label = "LIVE · NEBIUS TOKEN FACTORY" if mode == "live" else "DRY-RUN · OFFLINE"
 

@@ -13,6 +13,7 @@ import argparse
 import json
 import re
 import sys
+from datetime import datetime
 from html import escape
 from pathlib import Path
 
@@ -20,18 +21,28 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from sieve.benchmark import wilson  # noqa: E402
-from sieve.scenarios import REGISTRY  # noqa: E402
+from sieve.scenarios import public_catalog  # noqa: E402
+from sieve.targets import LABELS as NAMES, web_targets  # noqa: E402
 
 RES = ROOT / "results"
 PAGE = ROOT / "public" / "index.html"
 LABEL = {"inbox": "Email assistant", "bank": "Banking assistant", "docs": "Document assistant"}
-NAMES = {"nvidia/Nemotron-3_5-Lightning": "Nemotron 3.5 Lightning",
-         "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B": "Nemotron 3 Nano 30B",
-         "nvidia/Nemotron-3-Ultra-550b-a55b": "Nemotron 3 Ultra"}
 
 
 def pct(p: float) -> str:
     return f"{round(p * 100)}%"
+
+
+def day(stamp: str, year: bool = False) -> str:
+    """'2026-10-16 08:56' -> '16 Oct' (or '16 Oct 2026')."""
+    d = datetime.strptime(stamp[:10], "%Y-%m-%d")
+    return f"{d.day} {d:%b %Y}" if year else f"{d.day} {d:%b}"
+
+
+def counted(values, noun: str) -> str:
+    """'20 trials' when every value agrees, '17–20 trials' when a run was cut short."""
+    lo, hi = min(values), max(values)
+    return f"{lo} {noun}" if lo == hi else f"{lo}–{hi} {noun}"
 
 
 def parse_md(path: Path) -> dict:
@@ -39,19 +50,53 @@ def parse_md(path: Path) -> dict:
     text = path.read_text(encoding="utf-8")
     run = {"total_cost": float(re.search(r"total cost \$([\d.]+)", text).group(1)),
            "trials_per": int(re.search(r"Trials per scenario: (\d+)", text).group(1)),
+           "generated": re.search(r"\d{4}-\d{2}-\d{2}", path.stem).group(0),
            "scenarios": []}
-    for key, body in re.findall(r"^## .*?\((\w+)\).*?\n(.*?)(?=^## |\Z)", text, re.M | re.S):
+    for key, trials, body in re.findall(r"^## .*?\((\w+)\)\D*(\d+) trials\n(.*?)(?=^## |\Z)",
+                                        text, re.M | re.S):
         k, n = map(int, re.search(r"P\(critical\).*?\((\d+)/(\d+)\)", body).groups())
         p, lo, hi = wilson(k, n)
-        mean = float(re.search(r"mean ([\d.]+)", body).group(1))
+        mean, least, most = re.search(r"mean ([\d.]+), min (\d+), max (\d+)", body).groups()
         refused = float(re.search(r"Attacker refused ([\d.]+)%", body).group(1)) / 100
-        run["scenarios"].append({"key": key, "exceedance": {"critical": {
-            "k": k, "n": n, "p": p, "lo": lo, "hi": hi}}, "attempts": {"mean": mean},
+        run["scenarios"].append({"key": key, "trials": int(trials), "exceedance": {"critical": {
+            "k": k, "n": n, "p": p, "lo": lo, "hi": hi}},
+            "attempts": {"mean": float(mean), "min": int(least), "max": int(most)},
             "attacker_refusal_rate": refused})
+    run["total_trials"] = sum(s["trials"] for s in run["scenarios"])
     return run
 
 
+def attempts_note(runs: list[dict]) -> str:
+    """State the attempt cap when the results record it, else the observed range."""
+    caps = {r.get("max_attempts") for r in runs}
+    if len(caps) == 1 and None not in caps:
+        return f"Up to {caps.pop()} attempts per campaign."
+    lo = min(s["attempts"]["min"] for r in runs for s in r["scenarios"])
+    hi = max(s["attempts"]["max"] for r in runs for s in r["scenarios"])
+    return f"Campaigns ran {lo}–{hi} attempts."
+
+
+def overlap_note(comp: dict) -> str:
+    """Name the model pairs whose rates differ but whose 95% intervals overlap."""
+    pairs = []
+    for key in comp["scenarios"]:
+        cells = [(m["name"], m["scenarios"][key]["critical"]) for m in comp["models"]]
+        for i, (a, ea) in enumerate(cells):
+            for b, eb in cells[i + 1:]:
+                if (ea["n"] and eb["n"] and ea["p"] != eb["p"]
+                        and ea["lo"] <= eb["hi"] and eb["lo"] <= ea["hi"]):
+                    pairs.append(f"{a} and {b} ({LABEL[key].lower()})")
+    return (" Overlapping intervals, so no established difference: " + "; ".join(pairs) + ".") \
+        if pairs else ""
+
+
 def ci_row(label: str, e: dict, note: str) -> str:
+    if not e["n"]:  # no valid trials is missing data, never a 0% rate
+        return (
+            f'<div class="cirow"><div class="lbl"><span style="color:var(--fg)">{escape(label)}</span>'
+            f'<b>N/A</b></div><div class="track" role="img" aria-label="{escape(label)}: '
+            f'no valid trials"></div><div class="lbl"><span>{escape(note)}</span>'
+            f'<span>no valid trials</span></div></div>')
     low = " low" if e["p"] < 0.5 else ""
     return (
         f'<div class="cirow"><div class="lbl"><span style="color:var(--fg)">{escape(label)}</span>'
@@ -71,7 +116,8 @@ def bench_card(title: str, run: dict) -> str:
                f'mean {s["attempts"]["mean"]} attempts')
         for s in run["scenarios"])
     refusals = " / ".join(pct(s.get("attacker_refusal_rate", 0)) for s in run["scenarios"])
-    return (f'<div class="card"><div class="cap">{escape(title)} · {run["trials_per"]} trials per agent · '
+    trials = counted([s["trials"] for s in run["scenarios"]], "trials")
+    return (f'<div class="card"><div class="cap">{escape(title)} · {trials} per agent · '
             f'${run["total_cost"]:.2f}</div><div class="cibar">{rows}</div>'
             f'<div class="note">Attacker refusals: {refusals}.</div></div>')
 
@@ -83,23 +129,25 @@ def render() -> tuple[str, dict]:
     stats = json.loads((RES / "campaign-stats-2026-10-16.json").read_text(encoding="utf-8"))
     target = NAMES.get(day2["models"]["target"], day2["models"]["target"])
     by_key = {s["key"]: s for s in day2["scenarios"]}
-    hero = '<figcaption class="cap">Full compromise · Lightning agents · 16 Oct 2026</figcaption>'
+    hero = (f'<figcaption class="cap">Full compromise · {escape(target)} agents · '
+            f'{day(day2["generated"], year=True)}</figcaption>')
     hero += '<div class="cibar">' + "".join(
         ci_row(LABEL[key], by_key[key]["exceedance"]["critical"],
                f'{by_key[key]["exceedance"]["critical"]["k"]}/{by_key[key]["exceedance"]["critical"]["n"]} campaigns')
         for key in ("bank", "inbox", "docs")) + '</div>'
     hero += '<div class="foot-note">Whiskers: 95% Wilson intervals. Synthetic agents; not a general model rating.</div>'
     measured = stats[day2["models"]["target"]]
-    total = day1["trials_per"] * len(day1["scenarios"]) + day2["total_trials"]
+    total = day1["total_trials"] + day2["total_trials"]
+    days = len({day1["generated"][:10], day2["generated"][:10]})
     facts = "".join(f'<div class="fact"><div class="v">{value}</div><div class="k">{label}</div></div>'
                     for value, label in [
-                        (str(total), "benchmark campaigns · two days"),
+                        (str(total), f"benchmark campaigns · {days} days"),
                         (f'${day2["total_cost"]:.2f}', f'{day2["total_trials"]}-campaign replication'),
                         (f'${measured["median_cost_usd"]:.4f}', "median campaign · replication"),
                         (f'{measured["median_model_time_s"]:.1f}s', "median model time · replication")])
-    bench = '<div class="bench">' + bench_card("15 Oct · first run", day1)
-    bench += bench_card("16 Oct · independent replication", day2) + '</div>'
-    bench += (f'<p class="note">Target: {escape(target)}. Up to 10 attempts per campaign. '
+    bench = '<div class="bench">' + bench_card(f'{day(day1["generated"])} · first run', day1)
+    bench += bench_card(f'{day(day2["generated"])} · independent replication', day2) + '</div>'
+    bench += (f'<p class="note">Target: {escape(target)}. {attempts_note([day1, day2])} '
               'Each interval describes one day, not pooled trials. '
               '<a href="https://github.com/Nataniel0212/sieve/tree/main/results">Raw reports and methodology ↗</a></p>')
     compare = '<div class="tablewrap"><table class="comparison"><caption>Full-compromise rate by target model</caption><thead><tr><th>Target model</th>'
@@ -108,23 +156,29 @@ def render() -> tuple[str, dict]:
         compare += f'<tr><th scope="row">{escape(model["name"])}</th>'
         for key in comp["scenarios"]:
             e = model["scenarios"][key]["critical"]
+            if not e["n"]:
+                compare += '<td class="cell"><div class="p">N/A</div><div class="kn">no valid trials</div></td>'
+                continue
             cls = "hot" if e["p"] >= 0.5 else "cool" if e["k"] == 0 else ""
             compare += (f'<td class="cell {cls}"><div class="p">{pct(e["p"])}</div>'
                         f'<div class="kn">{e["k"]}/{e["n"]} · CI {pct(e["lo"])}–{pct(e["hi"])}</div></td>')
         compare += '</tr>'
-    compare += (f'</tbody></table></div><p class="note">{comp["trials_per"]} campaigns per cell · '
-                f'${comp["total_cost"]:.2f} total. Zero observed compromises does not establish immunity. '
-                'The email intervals for Lightning and Nano overlap.</p>')
+    cells = counted([s.get("trials", comp["trials_per"]) for m in comp["models"]
+                     for s in m["scenarios"].values()], "campaigns")
+    compare += (f'</tbody></table></div><p class="note">{cells} per cell · '
+                f'${comp["total_cost"]:.2f} total. Zero observed compromises does not establish immunity.'
+                f'{overlap_note(comp)}</p>')
     tech = '<div class="techs">'
     for scn in day2["scenarios"]:
         tech += f'<div class="card"><div class="cap">{escape(LABEL[scn["key"]])}</div>'
         for t in scn["techniques"]:
+            rate = pct(t["rate"]) if t["n"] else "N/A"
             tech += (f'<div class="trow"><span class="nm">{escape(t["name"])}</span>'
                      f'<span class="bar" aria-hidden="true"><i style="width:{t["rate"] * 100:.1f}%"></i></span>'
-                     f'<span class="v"><b>{pct(t["rate"])}</b> {t["k"]}/{t["n"]}</span></div>')
+                     f'<span class="v"><b>{rate}</b> {t["k"]}/{t["n"]}</span></div>')
         tech += '</div>'
-    tech += ('</div><p class="note">16 Oct replication. Technique order is fixed: these rates also reflect '
-             'attempt position and prior feedback, not isolated causal effects.</p>')
+    tech += (f'</div><p class="note">{day(day2["generated"])} replication. Technique order is fixed: '
+             'these rates also reflect attempt position and prior feedback, not isolated causal effects.</p>')
     html = PAGE.read_text(encoding="utf-8")
     for name, body in {"hero": hero, "facts": facts, "bench": bench, "compare": compare, "tech": tech}.items():
         pattern = rf"(<!-- build:{name} -->).*?(<!-- /build:{name} -->)"
@@ -132,11 +186,9 @@ def render() -> tuple[str, dict]:
         if count != 1:
             raise ValueError(f"Expected exactly one build block: {name}, found {count}")
     catalog = {
-        "scenarios": [{**s.meta(), "system_prompt": s.system_prompt, "user_task": s.user_task,
-                       "tools": [t["function"]["name"] for t in s.tools],
-                       "descriptions": s.descriptions} for s in REGISTRY.values()],
-        "targets": {key: {"label": NAMES[model], "id": model} for key, model in
-                    zip(("lightning", "nano", "ultra"), NAMES)},
+        "scenarios": public_catalog(),
+        "targets": {key: {"label": label, "id": model}
+                    for key, (label, model) in web_targets().items()},
         "replays": sorted(p.stem for p in (ROOT / "public/data/replays").glob("*.json")),
     }
     return html, catalog

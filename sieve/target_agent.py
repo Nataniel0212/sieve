@@ -8,7 +8,6 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 
-from .errors import BudgetStop
 from .scenarios import Env, Scenario
 
 MAX_STEPS = 6  # tool-calling turns before we force a stop
@@ -35,16 +34,13 @@ def run_target(client, cfg, meter, attempt: int, injection_text: str,
 
     final_text = ""
     for _ in range(MAX_STEPS):
-        if meter.total_cost() >= cfg.budget_usd:
-            raise BudgetStop()
+        # The campaign's BudgetedClient refuses any call once the budget is spent.
         result = client.chat(
             model=cfg.model_target, messages=messages, tools=scenario.tools,
             max_tokens=8192, enable_thinking=False, force_nonempty=True,
             temperature=TARGET_TEMPERATURE,
         )
         meter.record(phase, attempt, result)
-        if meter.total_cost() > cfg.budget_usd:
-            raise BudgetStop()
 
         if not result.tool_calls:
             final_text = result.content

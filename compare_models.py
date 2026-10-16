@@ -27,6 +27,7 @@ make_client = lambda _scn: LiveClient(cfg)  # noqa: E731
 scens = list(scenarios.REGISTRY)
 
 out = {"generated": time.strftime("%Y-%m-%d %H:%M"), "trials_per": TRIALS,
+       "max_attempts": cfg.max_attempts,
        "attacker": cfg.model_attacker, "scenarios": [s for s in scens], "models": []}
 spent = 0.0
 for name, mid in MODELS:
@@ -44,7 +45,8 @@ for name, mid in MODELS:
                "valid": s.get("valid_trials"), "trials": s["trials"]}
                for s in b["scenarios"]}}
     out["models"].append(row)
-    print(name, {k: f"{v['critical']['p']*100:.0f}%" for k, v in row["scenarios"].items()},
+    print(name, {k: f"{v['critical']['p']*100:.0f}%" if v["critical"]["n"] else "N/A"
+                 for k, v in row["scenarios"].items()},
           f"(${b['total_cost']:.2f})")
 
 out["total_cost"] = round(spent, 4)

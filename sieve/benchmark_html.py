@@ -240,7 +240,8 @@ refusal rates are in the table. Incomplete campaigns and unsafe baselines are ex
 
 <h2 class="section">Which attack techniques get through</h2>
 <p class="cap">Share of attempts using each technique that reached a full
-(critical) compromise, pooled across scenarios.</p>
+(critical) compromise, pooled across scenarios. Valid trials only, the same set
+as the rates above.</p>
 <div class="card">{_technique_chart(bench["scenarios"])}</div>
 
 <footer>

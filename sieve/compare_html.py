@@ -11,6 +11,11 @@ import html
 import json
 from pathlib import Path
 
+try:
+    from .targets import LABELS
+except ImportError:  # run as a script: python sieve/compare_html.py
+    from targets import LABELS
+
 SCEN_NAME = {"inbox": "Email", "bank": "Banking", "docs": "Document"}
 
 
@@ -95,6 +100,11 @@ def _chart(scens, models):
         for j, m in enumerate(models):
             e = m["scenarios"][sk]["critical"]
             x = gx + j * (bw + gap)
+            if not e["n"]:  # no valid trials is missing data, not a 0% rate
+                body.append(f'<text class="val" x="{x + bw / 2:.1f}" y="{_y(0) - 6:.1f}" '
+                            f'font-size="10.5" text-anchor="middle"><title>{_esc(m["name"])} on '
+                            f'{SCEN_NAME.get(sk, sk)}: no valid trials</title>N/A</text>')
+                continue
             h = e["p"] * PH
             body.append(f'<rect x="{x:.1f}" y="{_y(e["p"]):.1f}" width="{bw}" height="{h:.1f}" '
                         f'rx="3" fill="var(--m{j+1})"><title>{_esc(m["name"])} on '
@@ -113,12 +123,47 @@ def _chart(scens, models):
             f'{"".join(body)}</svg>')
 
 
+def _worst(model: dict, scens) -> float | None:
+    """A model's highest full-compromise rate over cells with valid trials."""
+    rates = [model["scenarios"][s]["critical"]["p"] for s in scens
+             if model["scenarios"][s]["critical"]["n"]]
+    return max(rates) if rates else None
+
+
+def _headline(scens, models) -> str:
+    # Claim the ranking only when the data shows it: the first-listed (smallest)
+    # model's worst cell is above the last-listed (largest) model's.
+    first, last = _worst(models[0], scens), _worst(models[-1], scens)
+    if len(models) > 1 and first is not None and last is not None and first > last:
+        return "Stronger Nemotron models resisted prompt injection better"
+    return "Prompt-injection resistance by Nemotron model"
+
+
+def _takeaway(scens, models) -> str:
+    parts = []
+    for m in models:
+        worst = _worst(m, scens)
+        if worst is None:
+            parts.append(f"{_esc(m['name'])} has no valid trials")
+        elif worst:
+            parts.append(f"{_esc(m['name'])} was fully compromised in up to "
+                         f"{worst * 100:.0f}% of campaigns in a scenario")
+        else:
+            parts.append(f"<b>{_esc(m['name'])} had no full compromise in any scenario</b> "
+                         "(zero observed is not proof of immunity)")
+    return "; ".join(parts) + "."
+
+
+def _rate(e: dict) -> str:
+    return f'{e["p"] * 100:.0f}%' if e["n"] else "N/A"
+
+
 def _table(scens, models):
     head = "<tr><th>target model</th>" + "".join(
         f"<th>{SCEN_NAME.get(s, s)}</th>" for s in scens) + "<th>cost</th></tr>"
     rows = [head]
     for m in models:
-        cells = "".join(f'<td>{m["scenarios"][s]["critical"]["p"]*100:.0f}%</td>' for s in scens)
+        cells = "".join(f'<td>{_rate(m["scenarios"][s]["critical"])}</td>' for s in scens)
         rows.append(f'<tr><td>{_esc(m["name"])}</td>{cells}<td>${m["cost"]:.2f}</td></tr>')
     return "<table>" + "".join(rows) + "</table>"
 
@@ -138,8 +183,8 @@ def _body(data):
   <span class="badge mono" id="theme">theme</span>
 </header>
 
-<h1>Stronger Nemotron models resist prompt injection</h1>
-<p class="sub">Same attacker (Nemotron Ultra), same scenarios, {data['trials_per']} trials
+<h1>{_headline(scens, models)}</h1>
+<p class="sub">Same attacker ({_esc(LABELS.get(data.get('attacker', ''), data.get('attacker', '?')))}), same scenarios, {data['trials_per']} trials
 each. Only the agent under test changes. Bars show the full-compromise rate;
 whiskers are 95% confidence intervals.</p>
 
@@ -151,11 +196,8 @@ whiskers are 95% confidence intervals.</p>
 {_table(scens, models)}
 
 <div class="take">
-  <b>Takeaway.</b> The small, cheap model most apps actually deploy
-  (Lightning) was compromised up to 100% of the time. The mid-size Nano was close
-  behind. The flagship <b>Ultra held at 0% everywhere</b> and went further — it did
-  the user's task and explicitly flagged the injected email as an attack. Security
-  is a model-choice tradeoff you can now measure.
+  <b>Takeaway.</b> {_takeaway(scens, models)} Security is a model-choice tradeoff
+  you can now measure.
 </div>
 
 <footer>

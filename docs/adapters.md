@@ -32,16 +32,18 @@ inside the function so one campaign does not contaminate another.
 | Context field or method | Purpose |
 |---|---|
 | `system_prompt`, `task` | The scenario's trusted instructions and user task |
-| `tools` | OpenAI-format schemas for the scenario's synthetic tools |
+| `tools` | OpenAI-format schemas for the scenario's synthetic tools (a private copy you may edit) |
 | `model` | The selected Nemotron target model |
 | `chat(messages, *, enable_thinking=False, temperature=0.3, max_tokens=8192)` | Returns `LLMResult`: content, parsed tool calls, actual model and usage; records tokens, latency and cost |
-| `execute_tool(name, arguments)` | Executes a tool in fresh synthetic state and emits its trace; arguments must be a dictionary |
+| `execute_tool(name, arguments)` | Executes a tool in fresh synthetic state and emits its trace. Like the built-in agent, an unknown tool name or non-dictionary arguments return an error string for the model rather than raising |
 
 Copy your agent's orchestration into the function, using `context.chat` and
 `context.execute_tool` at the model and tool boundaries. Return its final answer
 as a string. See [the complete example](../examples/custom_agent.py), including
 tool-call messages and the optional confirmation policy. A run allows up to
-12 model turns and 100 tool calls; budget stops apply between calls. An API
+12 model turns and 100 tool calls; reaching either cap ends that agent run with
+the actions taken so far, as the built-in agent's step cap does, and the
+campaign continues. Budget stops apply between calls. An API
 response can cross the budget by the cost of that last call.
 
 The adapter cannot declare itself safe: Sieve classifies the resulting sandbox

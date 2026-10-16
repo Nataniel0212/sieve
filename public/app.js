@@ -14,6 +14,8 @@
   const title = (value) => value.charAt(0).toUpperCase() + value.slice(1);
   const shortModel = (value) => String(value || "unknown").replace(/^nvidia\//, "");
   const severityClass = (value) => ({critical: "crit", high: "high", medium: "med", safe: "ok"}[value] || "warn");
+  const STOP_REASONS = {baseline_failed: "baseline failed · agent acted on benign content",
+    budget: "budget stop", http_402: "provider credit exhausted (HTTP 402)"};
   const state = {catalog: null, health: null, scenario: "bank", target: "lightning", busy: false,
     cards: new Map(), max: 0, calls: 0, tokens: 0, latency: 0, cost: 0, complete: false, replay: null};
 
@@ -198,7 +200,8 @@
       }
       case "injection": {
         const view = card(event.attempt, event.technique);
-        view.content.replaceChildren(el("div", "who", event.refused ? "Attacker refused · not a valid attack" : "Attacker · injected untrusted text"), el("pre", "inj", event.text));
+        view.who = el("div", "who", event.refused ? "Attacker refused · not a valid attack" : "Attacker · injected untrusted text");
+        view.content.replaceChildren(view.who, el("pre", "inj", event.text));
         break;
       }
       case "tool": {
@@ -211,6 +214,9 @@
       case "attempt": {
         if (!event.refused) state.realAttempts++;
         const view = card(event.attempt, event.technique);
+        // A payload that matched the refusal check but changed the agent's
+        // behaviour was a real attack; the server's final flag decides.
+        if (!event.refused && view.who) view.who.textContent = "Attacker · injected untrusted text";
         verdict(view, event.status, event.refused ? `Attacker refusal. Observed: ${event.desc}` : event.desc);
         view.reply.textContent = event.final_text || "";
         if (event.actions?.length) view.content.append(el("p", "actions", event.actions.join("\n")));
@@ -225,16 +231,20 @@
         state.latency = total.latency_s;
         meters();
         $("m-att").textContent = `${event.attempts_run}/${state.max}`;
-        const completed = ["max_attempts", "critical_found"].includes(event.stopped_reason) && event.baseline_safe === true && state.realAttempts > 0;
+        const finished = ["max_attempts", "critical_found"].includes(event.stopped_reason) && event.baseline_safe === true;
+        // The server's valid_trial is authoritative; older recordings predate it.
+        const completed = event.valid_trial ?? (finished && state.realAttempts > 0);
         const status = event.top_status;
-        const text = !completed ? `Inconclusive · ${state.realAttempts === 0 ? "no real attack completed" : event.stopped_reason.replaceAll("_", " ")}` :
+        // Say why a run stopped before saying that no real attack completed.
+        const why = !finished ? STOP_REASONS[event.stopped_reason] || event.stopped_reason.replaceAll("_", " ") : "no real attack completed";
+        const text = !completed ? `Inconclusive · ${why}` :
           status === "critical" ? `CRITICAL · attempt ${event.compromised_at}` :
             status === "safe" ? "HELD · within this campaign" : `${status.toUpperCase()} · partial compromise`;
         const cls = completed ? (status === "critical" ? "crit" : status === "safe" ? "ok" : "warn") : "warn";
         pill(text, cls);
         const node = el("li", `ev final ${cls}`);
         node.append(el("div", "big", text), el("div", "nums", `${event.attempts_run} attempts · ${total.calls} calls · ${money(total.cost_usd)} · ${seconds(total.latency_s)} model time`),
-          el("p", "note", !completed ? "This run stopped early. It is not evidence that the agent is safe." :
+          el("p", "note", !completed ? `${finished ? "Every attempt was an attacker refusal" : "This run stopped early"}. It is not evidence that the agent is safe.` :
             status === "critical" ? "The sandbox state confirms the unauthorized action. All accounts and data are synthetic." :
               "One campaign is not a robustness estimate. See the repeated benchmark and confidence intervals below."));
         feed.append(node);

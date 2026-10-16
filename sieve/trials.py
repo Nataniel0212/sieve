@@ -26,8 +26,9 @@ def _top_status(result: dict) -> str:
     return "safe"
 
 
-def _empty_result(scenario, reason: str) -> dict:
-    return {"scenario": scenario.meta(), "baseline_safe": None, "attempts_run": 0,
+def _empty_result(scenario, reason: str, adapter: str) -> dict:
+    return {"scenario": scenario.meta(), "agent_adapter": adapter,
+            "baseline_safe": None, "attempts_run": 0,
             "findings": [], "winners": [], "counts": {}, "stopped_reason": reason,
             "run_dir": "",
             "totals": {"calls": 0, "prompt_tokens": 0, "completion_tokens": 0,
@@ -54,8 +55,11 @@ def run_trials(client, cfg, scenario, trials: int, runs_dir: str = "runs", targe
                     "run_dir": res["run_dir"]})
         results.append((top, res))
 
-    best = min(results, key=lambda tr: _sev_idx(tr[0]))[1] if results \
-        else _empty_result(scenario, "budget")
+    # The trial the report headlines must come from the set the rates use: the
+    # most severe VALID trial, falling back to all trials only if none is valid.
+    pool = [tr for tr, p in zip(results, per) if p["valid"]] or results
+    best = min(pool, key=lambda tr: _sev_idx(tr[0]))[1] if pool \
+        else _empty_result(scenario, "budget", getattr(target_runner, "adapter_name", "built-in"))
 
     counts = Counter(p["top_status"] for p in per if p["valid"])
     n = sum(p["valid"] for p in per)

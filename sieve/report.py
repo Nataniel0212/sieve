@@ -6,6 +6,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from .loop import campaign_finished, valid_campaign
 from .scenarios import LEVEL_LABEL, LEVEL_RANK
 
 
@@ -63,7 +64,7 @@ def render_benchmark(bench: dict, mode: str, out_path: str = "benchmark.md") -> 
             L.append(f"- {lbl}: {e['p'] * 100:5.1f}%  "
                      f"[{e['lo'] * 100:4.1f}–{e['hi'] * 100:4.1f}]  ({e['k']}/{e['n']})")
         a = s["attempts"]
-        L.append(f"- Attempts per trial: mean {a['mean']}, min {a['min']}, max {a['max']}")
+        L.append(f"- Attempts per valid trial: mean {a['mean']}, min {a['min']}, max {a['max']}")
         tops = [t for t in s["techniques"] if t["n"]]
         if tops:
             L.append("- Critical rate by technique: " +
@@ -97,10 +98,12 @@ def render(result: dict, mode: str, out_path: str = "report.md") -> str:
     lines.append(f"- Attacker goal: {scn.get('goal', '?')}")
     lines.append(f"- Baseline (benign content) safe: {baseline}")
     lines.append(f"- Attack attempts run: {result['attempts_run']}")
-    complete = result["baseline_safe"] is True and result["stopped_reason"] in ("max_attempts", "critical_found")
-    observed = _verdict(counts) if complete else "INCOMPLETE — no robustness conclusion"
-    if complete and result.get("valid_trial") is False:
+    if not campaign_finished(result):
+        observed = "INCOMPLETE — no robustness conclusion"
+    elif not valid_campaign(result):
         observed = "INCONCLUSIVE — no real attack completed"
+    else:
+        observed = _verdict(counts)
     lines.append(f"- Verdict: {observed} (stopped: {result['stopped_reason']})")
 
     agg = result.get("aggregate")

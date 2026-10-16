@@ -7,22 +7,32 @@ this interface is intentionally not exposed by the public web API.
 """
 from __future__ import annotations
 
+import copy
 import importlib.util
 import sys
 import uuid
 from pathlib import Path
 
-from .errors import BudgetStop
 from .target_agent import TargetRun
+
+MAX_MODEL_TURNS = 12
+MAX_TOOL_CALLS = 100
+
+
+class AgentLimit(Exception):
+    """An adapter hit a per-run cap. The run ends with the actions taken so far,
+    like the built-in loop's step cap, instead of aborting the whole campaign."""
 
 
 class AgentContext:
     def __init__(self, client, cfg, meter, scenario, env, attempt, phase, on_event):
         self.system_prompt = scenario.system_prompt
         self.task = scenario.user_task
-        self.tools = scenario.tools
+        # A private copy: an adapter that edits its tool list must not change the
+        # shared scenario seen by later campaigns and the built-in loop.
+        self.tools = copy.deepcopy(scenario.tools)
         self.model = cfg.model_target
-        self._client, self._cfg, self._meter = client, cfg, meter
+        self._client, self._meter = client, meter
         self._scenario, self._env = scenario, env
         self._attempt, self._phase = attempt, phase
         self._emit = on_event or (lambda _event: None)
@@ -31,11 +41,10 @@ class AgentContext:
 
     def chat(self, messages: list[dict], *, enable_thinking: bool = False,
              temperature: float = 0.3, max_tokens: int = 8192):
-        """Same LLMResult as the built-in loop, with cost and event accounting."""
-        if self._meter.total_cost() >= self._cfg.budget_usd:
-            raise BudgetStop()
-        if self._calls >= 12:
-            raise RuntimeError("Adapter exceeded 12 model turns in one agent run")
+        """Same LLMResult as the built-in loop, with cost and event accounting.
+        The campaign's BudgetedClient refuses the call once the budget is spent."""
+        if self._calls >= MAX_MODEL_TURNS:
+            raise AgentLimit(f"{MAX_MODEL_TURNS} model turns")
         if not 1 <= max_tokens <= 8192:
             raise ValueError("Adapter max_tokens must be between 1 and 8192")
         self._calls += 1
@@ -44,20 +53,22 @@ class AgentContext:
             max_tokens=max_tokens, enable_thinking=enable_thinking,
             force_nonempty=True, temperature=temperature)
         self._meter.record(self._phase, self._attempt, result)
-        if self._meter.total_cost() > self._cfg.budget_usd:
-            raise BudgetStop()
         return result
 
     def execute_tool(self, name: str, arguments: dict) -> str:
-        """Execute against synthetic state and emit the same trace as the demo."""
-        if name not in {t["function"]["name"] for t in self.tools}:
-            raise ValueError(f"Unknown scenario tool: {name}")
-        if not isinstance(arguments, dict):
-            raise TypeError("Tool arguments must be a dictionary")
+        """Execute against synthetic state and emit the same trace as the demo.
+
+        As in the built-in loop, a bad call (an invented tool name, which fake
+        tool-call injections invite, or malformed arguments) returns an error
+        string for the model instead of aborting the campaign.
+        """
         self._tool_calls += 1
-        if self._tool_calls > 100:
-            raise RuntimeError("Adapter exceeded 100 tool calls in one agent run")
-        result = self._scenario.execute(name, arguments, self._env)
+        if self._tool_calls > MAX_TOOL_CALLS:
+            raise AgentLimit(f"{MAX_TOOL_CALLS} tool calls")
+        if isinstance(arguments, dict):
+            result = self._scenario.execute(name, arguments, self._env)
+        else:
+            result = "Error: tool arguments must be a JSON object"
         self._emit({"type": "tool", "phase": self._phase, "attempt": self._attempt,
                     "name": name, "args": arguments, "result": str(result)[:400]})
         return result
@@ -87,7 +98,10 @@ def load_adapter(spec: str):
     def run(client, cfg, meter, attempt, injection_text, scenario, phase="target", on_event=None):
         env = scenario.new_env(injection_text)
         context = AgentContext(client, cfg, meter, scenario, env, attempt, phase, on_event)
-        final_text = agent(context)
+        try:
+            final_text = agent(context)
+        except AgentLimit:
+            final_text = ""  # the sandbox state, not the reply, decides the verdict
         if not isinstance(final_text, str):
             raise TypeError("An agent adapter must return its final answer as a string")
         return TargetRun(env, final_text)
