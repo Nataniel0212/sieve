@@ -22,6 +22,8 @@ with Nano 30B and Ultra 550B for comparison.
 live campaigns are available without a code. Judges can also start a new campaign
 using the code in the private testing instructions.
 
+![Recorded bank campaign with injection, tool calls and metered outcome](docs/images/demo.png)
+
 ## Results
 
 ### Benchmark: 2 × 60 live campaigns, replicated
@@ -229,7 +231,7 @@ The published benchmark continues to describe the built-in agents.
 
 ## Tests and CI
 
-`pytest -q` runs offline tests covering:
+`pytest -q` runs 36 offline tests covering:
 
 - the Wilson interval
 - the state-based verdicts

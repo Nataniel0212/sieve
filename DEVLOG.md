@@ -278,9 +278,22 @@ Lightning) streamed end to end: first byte after 1.0 s, compromised at attempt
   trials produces N/A in reports. The existing published benchmark remains intact.
 - Load `.env` before constructing API choices/guard settings, and exclude browser
   artifacts, local environments and traces from deployment uploads.
-- **35 offline tests pass.** Browser checks passed for all nine replays, metering,
+- **36 offline tests pass.** Browser checks passed for all nine replays, metering,
   a streamed fake campaign, bad codes, API outage, 503 and truncated-stream
   fallback, replay controls, mobile layout, theme persistence and malicious text
   rendered without executing markup. Static page generation and JS syntax pass.
 - Updated README and adapter documentation; added public `FEEDBACK.md` with
   untimed onboarding stated honestly. Video/script work is deferred by request.
+
+Publication checks:
+- GitHub push protection caught two occurrences of a Stripe-shaped token invented
+  in one synthetic injection (inbox/Ultra). Only those strings were redacted in
+  the public replay, with a metadata note and visible label. All timing, token,
+  cost and outcome data is unchanged. Future recordings apply the same filter
+  and reject any trace containing the configured API key.
+- The first CI run exposed a pytest import-path difference between `pytest` and
+  `python -m pytest`; `pytest.ini` now declares the source root explicitly.
+- Production deployed and checked at `https://sieve-redteam.vercel.app`: static
+  assets and all nine recordings present, public live requests rejected without
+  a code, authorized bank/Lightning campaign complete in 3 attempts, 12 calls,
+  11.798 seconds of model time and $0.015717.
