@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Sieve — prompt-injection red team</title>
+<meta name="description" content="Sieve attacks a tool-using AI agent with an adaptive NVIDIA Nemotron attacker on Nebius Token Factory, checks the agent's real actions, and measures how often it gets hijacked.">
+<meta property="og:title" content="Sieve — does your AI agent leak like a sieve?">
+<meta property="og:description" content="Watch a live prompt-injection attack on a tool-using agent. NVIDIA Nemotron on Nebius Token Factory.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%232f58cc'/%3E%3Cg fill='%23fff'%3E%3Ccircle cx='10' cy='10' r='2.2'/%3E%3Ccircle cx='16' cy='10' r='2.2'/%3E%3Ccircle cx='22' cy='10' r='2.2'/%3E%3Ccircle cx='10' cy='16' r='2.2'/%3E%3Ccircle cx='16' cy='16' r='2.2'/%3E%3Ccircle cx='22' cy='16' r='2.2'/%3E%3Ccircle cx='16' cy='22' r='2.2'/%3E%3C/g%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+<nav>
+  <a class="brand" href="#top" aria-label="Sieve home">S<b>I</b>EVE</a>
+  <span class="sp"></span>
+  <a class="nlink hide-sm" href="#lab">Live attack</a>
+  <a class="nlink hide-sm" href="#results">Results</a>
+  <a class="nlink hide-sm" href="#how">How it works</a>
+  <a class="nlink" href="https://github.com/Nataniel0212/sieve" rel="noopener">GitHub ↗</a>
+  <button class="theme" id="theme" type="button" aria-label="Toggle colour theme">theme</button>
+</nav>
+
+<header class="hero" id="top">
+  <div>
+    <div class="eyebrow">Prompt-injection red team · NVIDIA Nemotron on Nebius</div>
+    <h1>Does your AI agent <span class="hl">leak like a sieve?</span></h1>
+    <p class="lead">Sieve points an attacker model at a tool-using agent, lets it
+    rewrite its attack after every failure, and checks the agent's real actions to
+    see whether it was hijacked. Pick an agent below and watch it happen.</p>
+    <div class="cta">
+      <a class="btn primary" href="#lab">Run an attack</a>
+      <a class="btn sec" href="#results">See the benchmark</a>
+    </div>
+  </div>
+  <figure class="chartcard" id="hero-chart" aria-live="polite">
+    <figcaption class="cap">Full-compromise rate · loading…</figcaption>
+  </figure>
+</header>
+
+<div class="facts" id="facts"></div>
+
+<!-- ============================== LAB ============================== -->
+<section id="lab">
+  <h2>Live attack</h2>
+  <p class="sub">Every step below is a real call to NVIDIA Nemotron on Nebius Token
+  Factory: the attacker writes an injection, the agent under test reads it while
+  doing its normal job, and a deterministic check of the agent's tool calls decides
+  the verdict. No LLM judges the outcome.</p>
+
+  <div class="lab">
+    <div class="controls">
+      <fieldset>
+        <legend class="step"><span>1</span>Agent to attack</legend>
+        <div class="scen" id="scen" role="radiogroup"></div>
+      </fieldset>
+
+      <fieldset>
+        <legend class="step"><span>2</span>Model under test</legend>
+        <div class="seg" id="models" role="radiogroup"></div>
+        <p class="hint" id="model-hint"></p>
+      </fieldset>
+
+      <fieldset>
+        <legend class="step"><span>3</span>Run it</legend>
+        <div class="runbtns">
+          <button class="btn primary" id="run-live" type="button">Run live</button>
+          <button class="btn sec" id="run-replay" type="button">Replay a recorded run</button>
+        </div>
+        <details class="code" id="code-box">
+          <summary>Have a judge code?</summary>
+          <label class="field">
+            <span>Judge code</span>
+            <input id="code" type="text" autocomplete="off" spellcheck="false" placeholder="from the Devpost testing notes">
+          </label>
+        </details>
+        <p class="live-status" id="live-status">Checking live availability…</p>
+      </fieldset>
+
+      <details class="brief" id="brief">
+        <summary>What the agent is told</summary>
+        <div id="brief-body"></div>
+      </details>
+    </div>
+
+    <div class="console" aria-live="polite">
+      <div class="console-head">
+        <div class="pill" id="pill"><span class="dot"></span><span id="pill-text">Idle</span></div>
+        <div class="mode" id="mode"></div>
+      </div>
+      <div class="meters" id="meters">
+        <div><span class="mv" id="m-att">0/0</span><span class="mk">attempts</span></div>
+        <div><span class="mv" id="m-calls">0</span><span class="mk">Nemotron calls</span></div>
+        <div><span class="mv" id="m-tok">0</span><span class="mk">tokens</span></div>
+        <div><span class="mv" id="m-cost">$0.0000</span><span class="mk">cost</span></div>
+        <div><span class="mv" id="m-time">0.0s</span><span class="mk">model time</span></div>
+      </div>
+      <ol class="feed" id="feed">
+        <li class="empty">Pick an agent and a model, then press <b>Run live</b> or
+        <b>Replay</b>. A campaign takes about 10–60 seconds.</li>
+      </ol>
+      <details class="calls" id="calls-box">
+        <summary>Per-call log <span id="calls-n"></span></summary>
+        <div class="tablewrap"><table id="calls">
+          <thead><tr><th>#</th><th>role</th><th>model</th><th>in</th><th>out</th><th>latency</th><th>cost</th></tr></thead>
+          <tbody></tbody>
+        </table></div>
+      </details>
+      <div class="replay-ctl" id="replay-ctl" hidden>
+        <button class="btn sec small" id="skip" type="button">Skip to the end</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================ RESULTS ============================ -->
+<section id="results">
+  <h2>The benchmark</h2>
+  <p class="sub">One live run is an anecdote. The benchmark runs many independent
+  campaigns per agent and reports the full-compromise rate with a 95% Wilson
+  confidence interval. Every number on this page is loaded from the JSON the
+  benchmark wrote; none is typed in by hand.</p>
+  <div id="bench"></div>
+
+  <h3 class="h3">Does a bigger model resist better?</h3>
+  <p class="sub">Same attacker (Nemotron 3 Ultra), three Nemotron models as the agent
+  under test. Cells are the full-compromise rate; k/n trials below.</p>
+  <div id="compare"></div>
+
+  <h3 class="h3">Which attacks get through</h3>
+  <p class="sub">Critical success rate per attempt, by the technique the attacker was
+  told to try.</p>
+  <div id="tech"></div>
+
+  <h3 class="h3">We caught our own benchmark lying</h3>
+  <p class="sub">The attacker model kept refusing to write payloads, which silently
+  made the agents look safe. Three measurement passes, each more honest than the
+  last (email / bank / docs, full-compromise %).</p>
+  <div class="stages">
+    <div class="stage"><div class="t">1 · Naive</div><div class="n">10 / 0 / 0</div>
+      <div class="d">The attacker refused 72–86% of the time, so the agents were barely attacked.</div></div>
+    <div class="stage"><div class="t">2 · Valid-trial statistics</div><div class="n">70 / 47 / 5</div>
+      <div class="d">Detect refusals; count only trials that contained a real attack.</div></div>
+    <div class="stage win"><div class="t">3 · Root cause fixed</div><div class="n">95 / 100 / 10</div>
+      <div class="d">Attacker reasoning off: refusals fell to 0%. This is the true picture.</div></div>
+  </div>
+</section>
+
+<!-- ============================== HOW ============================== -->
+<section id="how">
+  <h2>How it works</h2>
+  <p class="sub">Two roles, both NVIDIA Nemotron models served by Nebius Token
+  Factory, and one deterministic referee.</p>
+  <figure class="diagram">
+    <svg viewBox="0 0 900 300" role="img" aria-label="Sieve architecture: the attacker writes an injection into untrusted data, the agent under test reads it while doing its task, a state check of its tool calls decides the verdict, and the result is fed back to the attacker.">
+      <defs>
+        <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" class="ah"/></marker>
+      </defs>
+      <g class="node"><rect x="20" y="40" width="230" height="104" rx="12"/>
+        <text x="40" y="72" class="nt">Attacker</text>
+        <text x="40" y="96" class="ns">Nemotron 3 Ultra 550B</text>
+        <text x="40" y="118" class="ns">thinking off · temperature 1.0</text></g>
+      <g class="node warn"><rect x="335" y="40" width="230" height="104" rx="12"/>
+        <text x="355" y="72" class="nt">Untrusted data</text>
+        <text x="355" y="96" class="ns">an email · a bank memo</text>
+        <text x="355" y="118" class="ns">a document</text></g>
+      <g class="node"><rect x="650" y="40" width="230" height="104" rx="12"/>
+        <text x="670" y="72" class="nt">Agent under test</text>
+        <text x="670" y="96" class="ns">Lightning · Nano · Ultra</text>
+        <text x="670" y="118" class="ns">real tool-calling loop</text></g>
+      <g class="node ok"><rect x="650" y="200" width="230" height="80" rx="12"/>
+        <text x="670" y="232" class="nt">State check</text>
+        <text x="670" y="256" class="ns">did money / a secret / a file move?</text></g>
+      <g class="node"><rect x="20" y="200" width="230" height="80" rx="12"/>
+        <text x="40" y="232" class="nt">Benchmark</text>
+        <text x="40" y="256" class="ns">n trials · Wilson 95% CI · $</text></g>
+      <path class="edge" d="M250 92 H333" marker-end="url(#ar)"/>
+      <text x="262" y="82" class="el">injection</text>
+      <path class="edge" d="M565 92 H648" marker-end="url(#ar)"/>
+      <text x="580" y="82" class="el">reads it</text>
+      <path class="edge" d="M765 144 V198" marker-end="url(#ar)"/>
+      <text x="773" y="176" class="el">tool calls</text>
+      <path class="edge" d="M650 240 H252" marker-end="url(#ar)"/>
+      <text x="380" y="232" class="el">verdict per attempt</text>
+      <path class="edge dash" d="M135 200 V146" marker-end="url(#ar)"/>
+      <text x="143" y="178" class="el">feedback: what the agent did</text>
+    </svg>
+  </figure>
+
+  <div class="rows">
+    <div class="row"><h3>Attacker: Nemotron 3 Ultra</h3>
+      <p>The hard, creative job. It rotates six techniques (system notice,
+      pre-authorization, output hijack, fake tool call, step splitting, urgency) and
+      is told exactly how far its last attempt got. Reasoning is off: with it on,
+      Ultra refused 25–54% of attempts in a 60-trial run; with it off, 0%.</p></div>
+    <div class="row"><h3>Agent under test</h3>
+      <p>Nemotron 3.5 Lightning by default, at $0.06 / $0.24 per million tokens, or
+      Nano 30B or Ultra 550B to compare. It runs a real tool-calling loop on its
+      ordinary task. The injection is the only thing that changes between attempts.</p></div>
+    <div class="row"><h3>Referee: code, not a model</h3>
+      <p>The verdict comes from the agent's actual tool calls: did a secret leave
+      to an outside address, did money move, was a file deleted? An injection cannot
+      talk its way past a state check.</p></div>
+    <div class="row"><h3>Guardrails on this demo</h3>
+      <p id="guard-copy">Each live run has a hard cost cap and a limited number of
+      attempts. Daily and lifetime spend caps are reserved before a run starts.
+      When the budget or the API is unavailable, the page fails closed to recorded
+      runs, which are labelled as recordings.</p></div>
+  </div>
+</section>
+
+<footer>
+  <span class="mono">Sieve</span> is defensive security research: you test only agents
+  you own, on fully synthetic fixtures. No real person, account, secret or file is
+  involved. MIT licensed. Built for the Nebius × NVIDIA Global AI Hackathon.<br>
+  <a href="https://github.com/Nataniel0212/sieve" rel="noopener">github.com/Nataniel0212/sieve</a>
+</footer>
+</div>
+<script src="app.js"></script>
+</body>
+</html>

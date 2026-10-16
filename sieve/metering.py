@@ -12,6 +12,7 @@ import json
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Callable, Optional
 
 # USD per 1M tokens (in, out). Token Factory catalog as of 2026-10-13;
 # verify in the live catalog before the demo. Override is not needed for the
@@ -41,6 +42,7 @@ def cost_usd(model: str, prompt_tokens: int, completion_tokens: int) -> float:
 class Meter:
     path: Path
     rows: list[dict] = field(default_factory=list)
+    on_record: Optional[Callable[[dict], None]] = None  # e.g. stream to the web UI
 
     def __post_init__(self) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
@@ -66,6 +68,8 @@ class Meter:
         self.rows.append(row)
         with self.path.open("a", encoding="utf-8") as fh:
             fh.write(json.dumps(row) + "\n")
+        if self.on_record:
+            self.on_record(row)
         return row
 
     def total_cost(self) -> float:

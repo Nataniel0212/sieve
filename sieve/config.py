@@ -25,7 +25,14 @@ def load_dotenv(path: str = ".env") -> None:
         if not line or line.startswith("#") or "=" not in line:
             continue
         key, _, value = line.partition("=")
-        key, value = key.strip(), value.strip().strip('"').strip("'")
+        value = value.strip()
+        if value[:1] in ("'", '"'):
+            value = value.strip('"').strip("'")
+        elif value.startswith("#"):  # empty value followed by a comment
+            value = ""
+        elif " #" in value:  # unquoted inline comment
+            value = value.split(" #", 1)[0].strip()
+        key = key.strip()
         os.environ.setdefault(key, value)
 
 
@@ -38,6 +45,9 @@ class Config:
     max_attempts: int
     budget_usd: float
     live: bool
+    # Optional resilience fallback (e.g. Ultra -> Lightning) for the hosted demo.
+    # Off by default so benchmark numbers are always on the named model.
+    model_fallback: str = ""
 
     @classmethod
     def from_env(cls, live: bool, max_attempts: int | None = None,
@@ -56,6 +66,7 @@ class Config:
             budget_usd=budget_usd if budget_usd is not None
             else float(os.environ.get("BUDGET_USD", "3.00")),
             live=live,
+            model_fallback=os.environ.get("MODEL_FALLBACK", ""),
         )
 
     def require_live_ready(self) -> None:

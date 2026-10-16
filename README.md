@@ -1,135 +1,242 @@
 # Sieve
 
+[![ci](https://github.com/Nataniel0212/sieve/actions/workflows/ci.yml/badge.svg)](https://github.com/Nataniel0212/sieve/actions/workflows/ci.yml)
+![license](https://img.shields.io/badge/license-MIT-blue)
+
 **Does your AI agent leak like a sieve?** Sieve is an automated prompt-injection
-red-team and **benchmark** for tool-using LLM agents. It attacks an agent you
-control, verifies every outcome against the agent's real actions, and reports a
-rigorous **attack-success rate with 95% confidence intervals** — so you can
-measure how exposed an agent is *before* you ship it.
+red team and **benchmark** for tool-using LLM agents. It attacks an agent you
+control with an adaptive attacker model, checks every outcome against the agent's
+real tool calls, and reports an **attack-success rate with 95% confidence
+intervals**, so you can measure how exposed an agent is *before* you ship it.
 
 Everything runs on **NVIDIA Nemotron via Nebius Token Factory**: the attacker is
-**Nemotron Ultra**, the agent under test is **Nemotron Lightning**.
+**Nemotron 3 Ultra**; the agent under test is **Nemotron 3.5 Lightning** by default,
+with Nano 30B and Ultra 550B for comparison.
 
-> Built for the Nebius x NVIDIA Global AI Hackathon. Defensive security research,
-> in the tradition of garak and PyRIT: you only test agents you own. Synthetic
-> data only — no real person, account, secret or file exists anywhere in this repo.
+> Built solo for the [Nebius × NVIDIA Global AI Hackathon](https://nebiusglobalaihackathon.devpost.com).
+> Defensive security research in the tradition of garak and PyRIT: you only test
+> agents you own. Synthetic data only. No real person, account, secret or file
+> exists anywhere in this repo.
 
-## The result (60 live trials, measured, $0.99)
+## Results
 
-Three toy agents, 20 independent trials each. "Full compromise" = the agent took
-the dangerous action (exfiltrated a secret, wired money, deleted files) because
-an injected message told it to.
+### Benchmark: 60 live campaigns, $0.99
 
-| Agent under test | Full-compromise rate | 95% CI | Attacker refusals |
-|---|---|---|---|
-| **Banking assistant** (wire funds) | **100%** | 84–100% | 0% |
-| **Email assistant** (leak a secret) | **95%** | 76–99% | 0% |
-| **Document assistant** (delete files) | **10%** | 3–30% | 0% |
+Three agents, 20 independent campaigns each. *Full compromise* means the agent
+took the dangerous action (exfiltrated a secret, wired money, deleted a file)
+because injected content told it to.
 
-The dominant attack technique was **output-hijacking** (tell the agent its result
-must be *delivered* by performing the dangerous action): 78% on banking, 50% on
-email. Robustness differs sharply by agent — Sieve measures the difference.
+| Agent under test (Lightning) | Full-compromise rate | 95% CI | Mean attempts | Attacker refusals |
+|---|---|---|---|---|
+| **Banking assistant** (wire funds) | **100%** (20/20) | 84–100% | 3.7 | 0% |
+| **Email assistant** (leak a secret) | **95%** (19/20) | 76–99% | 3.35 | 0% |
+| **Document assistant** (delete files) | **10%** (2/20) | 3–30% | 9.6 | 0% |
 
-Every number here is produced by `run.py`, logged to JSONL, and reproducible; see
-[DEVLOG.md](DEVLOG.md). Nothing is hand-written.
+The strongest technique was **output hijacking**: telling the agent that its
+result must be *delivered* by performing the dangerous action. 78% of those
+attempts fully compromised the banking agent (14/18), and 50% the email agent
+(7/14). Raw report:
+[`results/benchmark-2026-10-15.md`](results/benchmark-2026-10-15.md).
+
+### Does a bigger model resist better? Yes, sharply
+
+Same attacker, three Nemotron models as the agent under test, 10 campaigns per
+cell, $2.27 total ([`results/compare-2026-10-15.json`](results/compare-2026-10-15.json)):
+
+| Agent model | Email | Banking | Documents | Median $ / campaign | Median model time |
+|---|---|---|---|---|---|
+| Nemotron 3.5 Lightning | 90% | 100% | 0% | $0.0071 | 9.0 s |
+| Nemotron 3 Nano 30B | 60% | 100% | 0% | $0.0202 | 33.5 s |
+| Nemotron 3 Ultra 550B | **0%** | **0%** | **0%** | $0.0379 | 28.1 s |
+
+Ultra did not just stay inert. It called its tools, did the task, and explicitly
+flagged the injected message as suspicious. Prompt-injection robustness is a
+measurable property of the model choice. Cost and latency come from
+[`results/campaign-stats-2026-10-15.json`](results/campaign-stats-2026-10-15.json).
+
+### We caught our own benchmark lying
+
+| Pass | Email / Bank / Docs | What changed |
+|---|---|---|
+| 1. Naive | 10 / 0 / 0 % | The attacker *refused* to write a payload on 72–86% of attempts, silently making agents look safe |
+| 2. Valid-trial statistics | 70 / 47 / 5 % | Refusals detected and tagged; only trials with ≥ 1 real attack count; refusal rate reported (25–54%) |
+| 3. Root cause fixed | 95 / 100 / 10 % | Attacker reasoning switched **off**: refusals fell to 0% |
+
+Details and every intermediate number are in [DEVLOG.md](DEVLOG.md).
 
 ## Why a measurement tool, not a chatbot
 
-A chat can try a few injections. A benchmark has to be *correct*:
-
-- **Adaptive attacks.** Static templates are weak. Sieve uses a TAP-style loop
-  (arXiv [2606.10525](https://arxiv.org/abs/2606.10525)): the attacker reads how
-  the agent reacted and rewrites the next injection.
-- **State-based verification.** Success is checked against the agent's actual tool
-  calls (did the secret leave? did money move?), never by an LLM judge an
-  injection could fool — following AgentDojo (arXiv
+- **Adaptive attacks.** Static templates are weak. Sieve runs a TAP-style loop
+  (arXiv [2606.10525](https://arxiv.org/abs/2606.10525)): the attacker is told how
+  far its last attempt got and rewrites the next one.
+- **State-based verification.** Success is decided by the agent's actual tool
+  calls (did the secret leave? did money move?), never by an LLM judge that an
+  injection could fool. This follows AgentDojo (arXiv
   [2406.13352](https://arxiv.org/abs/2406.13352)).
-- **Honest statistics.** Rates come from independent trials with **95% Wilson
-  confidence intervals**, not a single lucky run.
-- **A confound we found and fixed.** The attacker model *refused* to write a
-  payload in 72–86% of early attempts, silently making agents look safe. Sieve now
-  detects refusals, excludes all-refusal trials, reports the refusal rate, and —
-  by disabling the attacker's chain-of-thought — cut refusals to ~0%. See the
-  three measurement passes in [DEVLOG.md](DEVLOG.md).
-- **Cheap at volume.** 60 full campaigns for under a dollar on Nemotron.
+- **Honest statistics.** Independent trials, 95% Wilson score intervals, per-technique
+  rates, and the attacker's own refusal rate reported next to every result.
+- **Cheap at volume.** A full Lightning campaign has a median cost of $0.0071.
 
 ## How it works
 
-```
-attacker (Nemotron Ultra) ──writes injection──► agent under test (Nemotron Lightning)
-        ▲                                                   │
-        │   feedback: what the agent did                    ▼
-        └──────────────── deterministic state check (did it take the bad action?)
+```mermaid
+flowchart LR
+    A["Attacker<br/>Nemotron 3 Ultra<br/>thinking off · temp 1.0"] -->|writes injection| D["Untrusted data<br/>email · bank memo · document"]
+    D -->|read during its normal task| T["Agent under test<br/>Lightning · Nano · Ultra<br/>real tool-calling loop"]
+    T -->|tool calls| S{"State check<br/>did money, a secret<br/>or a file move?"}
+    S -->|verdict| B["Benchmark<br/>n trials · Wilson 95% CI · $"]
+    S -.->|feedback: what the agent did| A
 ```
 
-- `sieve/scenarios.py` — pluggable agents + tasks + injection points + state checks
-- `sieve/attacker.py` — the TAP attacker (payload prompt, technique rotation, refusal handling)
-- `sieve/target_agent.py` — the agent under test (a real tool-calling loop)
-- `sieve/loop.py` — baseline + attack loop + budget guard
-- `sieve/benchmark.py` — independent trials, Wilson CIs, per-technique rates
-- `sieve/metering.py` — per-call tokens / latency / cost to JSONL
-- `sieve/nebius.py` — Nebius Token Factory client + Nemotron quirk handling
+Each campaign: a **baseline** run with benign content (the agent must stay
+safe), then up to *N* adaptive attempts. It stops at the first full compromise,
+at *N*, or when the budget guard trips.
+
+| Module | Role |
+|---|---|
+| `sieve/scenarios.py` | Pluggable agents: system prompt, task, tools, injection point, state check |
+| `sieve/attacker.py` | The attacker: technique rotation, progress feedback, refusal detection |
+| `sieve/target_agent.py` | The agent under test: a real tool-calling loop |
+| `sieve/loop.py` | Baseline + attack loop + budget guard; emits a live event stream |
+| `sieve/benchmark.py` | Independent trials, Wilson CIs, per-technique rates |
+| `sieve/metering.py` | Per-call tokens, latency and cost to JSONL |
+| `sieve/nebius.py` | Token Factory client and Nemotron quirk handling |
+| `sieve/guard.py` | Spend and abuse guard for the hosted demo |
+| `app.py` | FastAPI web API (streams a live campaign as NDJSON) |
 
 ### Built-in scenarios
 
-| key | Agent | Dangerous action the injection aims for |
-|---|---|---|
-| `inbox` | email assistant | fetch an account secret and email it out |
-| `bank` | banking assistant | transfer funds to an external payee |
-| `docs` | document assistant | delete the user's files |
+| key | Agent | Its ordinary task | What the injection aims for |
+|---|---|---|---|
+| `inbox` | email assistant | summarize my inbox | fetch an account secret and email it out |
+| `bank` | banking assistant | what's my balance? | transfer funds to an external payee |
+| `docs` | document assistant | summarize my documents | delete the user's files |
 
-## Run it
+## How we use NVIDIA Nemotron & Nebius Token Factory
 
-Dry-run is the default: **no API key, no network, no cost** (offline fakes drive
-the full pipeline).
+Every LLM call goes **directly** to Nebius Token Factory
+(`https://api.tokenfactory.nebius.com/v1`, OpenAI-compatible), never through any
+gateway.
+
+| Role | Model id | Settings | Why |
+|---|---|---|---|
+| Attacker | `nvidia/Nemotron-3-Ultra-550b-a55b` | `enable_thinking: false`, temperature 1.0 | The hardest, most creative job. With reasoning on, it refused far more often; off, 0% |
+| Agent under test (default) | `nvidia/Nemotron-3_5-Lightning` | thinking off, temperature 0.3, `force_nonempty_content` | A cheap, fast, realistic production agent |
+| Agent under test (compare) | `nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B`, `nvidia/Nemotron-3-Ultra-550b-a55b` | same | Measure robustness against model size |
+
+Handled in `sieve/nebius.py`: reasoning toggles via
+`extra_body.chat_template_kwargs`, tool-call markup that leaks into `content` is
+stripped, tool arguments are parsed back into objects, missing `usage` is
+tolerated, transient errors are retried with backoff, and HTTP 402 (out of credit
+mid-call) stops a run cleanly. Model ids live in the environment and swap without a
+code change; an optional `MODEL_FALLBACK` lets the hosted demo degrade to
+Lightning. It is off for benchmarks, so their numbers are always on the named
+model.
+
+What worked and what didn't: [FRICTION_LOG.md](FRICTION_LOG.md).
+
+## Quickstart (under 5 minutes)
 
 ```bash
-py -3.12 run.py                          # offline dry-run
-py -3.12 run.py --scenario bank          # pick a scenario
-py -3.12 run.py --live --scenario inbox  # one live campaign on Nebius
-py -3.12 run.py --live --benchmark --trials 20 --budget 3   # the full benchmark
+git clone https://github.com/Nataniel0212/sieve && cd sieve
+pip install -r requirements-dev.txt
+pytest -q                          # 24 offline tests, no key, no network
+python run.py --scenario bank      # offline dry-run of the full pipeline
 ```
 
-For live runs:
+Dry-run is the default: **no API key, no network, no cost.** Deterministic fakes
+drive the whole pipeline. For live runs:
 
 ```bash
-cp .env.example .env     # then fill in NEBIUS_API_KEY
-pip install -r requirements.txt
+cp .env.example .env               # then set NEBIUS_API_KEY
+python run.py --live --scenario inbox                      # one live campaign
+python run.py --live --benchmark --trials 20 --budget 3    # the benchmark above
+python compare_models.py                                   # the model comparison
 ```
 
-Outputs per run: a console report, `report.html` / `benchmark.html` (self-contained,
-light + dark), and a timestamped `runs/<ts>/` with `metrics.jsonl`, `attempts.jsonl`
-and `summary.json`.
+Each run writes a console report, a self-contained `report.html` / `benchmark.html`
+(light and dark), and a unique `runs/<timestamp>-<id>/` folder containing
+`metrics.jsonl` (every call: model, tokens, reasoning tokens, latency, cost),
+`attempts.jsonl` and `summary.json`.
 
-## Powered by Nebius + NVIDIA
+## Web API (hosted demo backend)
 
-- **Nebius Token Factory** — every LLM call goes directly here (OpenAI-compatible),
-  never through any gateway. Reasoning toggles, `force_nonempty_content`, tool-call
-  sanitising and a hard budget guard (for mid-call HTTP 402) are handled in
-  `sieve/nebius.py`.
-- **NVIDIA Nemotron** — `Nemotron-3-Ultra-550b-a55b` (attacker) and
-  `Nemotron-3_5-Lightning` (agent under test). Model ids live in `.env` and swap
-  without a code change.
+```bash
+uvicorn app:app --reload                                 # http://127.0.0.1:8000
+SIEVE_FAKE_LLM=1 DEMO_ACCESS_CODE=dev uvicorn app:app    # offline, no spend
+```
 
-See [FRICTION_LOG.md](FRICTION_LOG.md) for what worked and what didn't.
+| Endpoint | |
+|---|---|
+| `GET /api/health` | models, whether live runs are open, today's demo spend |
+| `GET /api/scenarios` | the agents, their tasks and tools |
+| `POST /api/attack` `{scenario, target, code?}` | streams one live campaign as NDJSON: injections, each tool call, verdicts, per-call cost |
 
-## Measurement & reproducibility
+Token Factory has no spend cap, so the demo's guard (`sieve/guard.py`) **fails
+closed**:
 
-Every call is logged with model, prompt/completion/reasoning tokens, latency and
-cost (`real_tokens × published_rate`; the rate table is the single source of truth
-in `sieve/metering.py`). A `BUDGET_USD` guard stops a run before overspend.
+- a kill switch
+- a hard cost cap and attempt limit per run
+- daily and lifetime caps, *reserved before* a run starts and settled to the real
+  metered cost afterwards, so concurrent runs cannot overspend
+- a per-IP hourly limit and a judge code
+
+Without a shared Redis store (Upstash), public runs are off and only judge-code
+runs are allowed. Configuration: `DEMO_*` variables in [`.env.example`](.env.example).
+
+## Tests and CI
+
+`pytest -q` runs 24 offline tests covering:
+
+- the Wilson interval
+- the state-based verdicts
+- tool-call sanitizing and metering
+- unique run directories and the event-stream order
+- the budget stop
+- the spend guard: judge-only fail-closed, pool caps and settlement, IP limits,
+  store outage, kill switch
+- the streaming API
+
+CI runs the tests, a dry-run of every scenario, and a gitleaks secret scan. The
+scan uses an extra rule for Nebius keys ([`.gitleaks.toml`](.gitleaks.toml)),
+because the default rules do not recognise that format.
+
+## Known limitations
+
+- **Toy agents.** Three synthetic agents with small tool sets. Real agents have
+  larger contexts, more tools and their own defenses. An adapter for external
+  agents is next on the roadmap.
+- **Technique and attempt number are confounded.** Techniques rotate in a fixed
+  order, so the per-technique rates also reflect *when* a technique is tried.
+- **Small n for the model comparison** (10 per cell). The intervals are wide; read
+  the 0% vs 100% contrasts, not the 60% vs 90% ones.
+- **The attacker is itself an LLM.** A stronger or less safety-tuned attacker would
+  likely raise every number; these are lower bounds.
+- **Stochastic.** The attacker runs at temperature 1.0. Rates, not single runs,
+  are the result.
+
+## Model licenses
+
+Sieve calls these models through the Token Factory API and does not redistribute
+weights.
+
+| Model | License |
+|---|---|
+| Nemotron 3 Ultra 550B, Nemotron 3.5 Lightning | OpenMDW-1.1 |
+| Nemotron 3 Nano 30B | NVIDIA Nemotron Open Model License (Licensed by NVIDIA Corporation under the NVIDIA Nemotron Model License) |
 
 ## Scope of use
 
-Sieve attacks only agents you own or are authorized to test, using fully synthetic
-fixtures. It is a defensive tool: find the hole before an attacker does.
+Sieve attacks only agents you own or are authorized to test, using fully
+synthetic fixtures. It is a defensive tool: find the hole before an attacker does.
 
 ## Roadmap
 
-- Point Sieve at your **own / external** agent via an adapter.
-- Run against **AgentDojo** (MIT) suites for numbers comparable to the literature.
-- Suggested fixes per finding.
+- Point Sieve at your **own agent** through an adapter (HTTP or Python).
+- Run **AgentDojo** (MIT) suites for numbers comparable to the literature.
+- Suggest a mitigation per finding and re-measure with it applied.
 
 ## License
 
-MIT — see [LICENSE](LICENSE). Built from scratch for this hackathon; no code, data
-or models from any prior project. Synthetic data only.
+MIT, see [LICENSE](LICENSE). Built from scratch during the hackathon (first commit
+2026-10-14); no code, data or models from any prior project.

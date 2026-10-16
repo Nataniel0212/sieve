@@ -69,6 +69,7 @@ class LiveClient:
         self._client = OpenAI(base_url=cfg.base_url, api_key=cfg.api_key)
         self._max_retries = max_retries
         self._backoff_s = backoff_s
+        self._fallback = getattr(cfg, "model_fallback", "") or ""
 
     def chat(self, model, messages, tools=None, max_tokens=8192,
              enable_thinking=False, force_nonempty=False,
@@ -85,7 +86,6 @@ class LiveClient:
         if temperature is not None:
             kwargs["temperature"] = temperature
 
-        last_exc: Exception | None = None
         for i in range(self._max_retries + 1):
             t0 = time.time()
             try:
@@ -96,11 +96,18 @@ class LiveClient:
                     raise PaymentRequiredError(str(exc)) from exc
                 if kind == "retry" and i < self._max_retries:
                     time.sleep(self._backoff_s * (2 ** i))
-                    last_exc = exc
                     continue
+                if self._fallback and model != self._fallback:
+                    # The model is unavailable: degrade once to the fallback. The
+                    # metered row carries the model that actually answered.
+                    return self.chat(self._fallback, messages, tools=tools,
+                                     max_tokens=max_tokens,
+                                     enable_thinking=enable_thinking,
+                                     force_nonempty=force_nonempty,
+                                     temperature=temperature)
                 raise
             return self._parse(resp, model, time.time() - t0)
-        raise last_exc  # pragma: no cover
+        raise RuntimeError("unreachable")  # pragma: no cover
 
     @staticmethod
     def _parse(resp, model, latency) -> LLMResult:

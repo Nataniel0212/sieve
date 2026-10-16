@@ -169,3 +169,64 @@ attempting to trick you..."). Security is a measurable model-choice tradeoff.
 Next (product):
 - 3-min video (script drafted).
 - AgentDojo (MIT) suites; adapter for a real agent (memory sieve-adapter-todo).
+
+## 2026-10-16: Hosted-demo backend, spend guard, tests, CI
+
+Goal: make Sieve usable by a judge without a key, while still being safe to
+leave running until mid-December on a Token Factory account with no spend cap.
+
+Done:
+- **Live event stream.** `loop.run_spike(on_event=...)` emits `start`, `call`
+  (every metered Nemotron call: model, tokens, latency, cost, running total),
+  `baseline`, `attempt_start`, `injection`, `tool` (each tool call as the agent
+  makes it), `attempt` (verdict) and `done`.
+- **Web API** (`app.py`, FastAPI on Vercel's Python runtime): `/api/health`,
+  `/api/scenarios`, and `POST /api/attack`, which streams one live campaign as
+  NDJSON with heartbeats. `SIEVE_FAKE_LLM=1` runs it on the offline fakes.
+- **Spend guard** (`sieve/guard.py`), fail-closed:
+  - kill switch
+  - per-run cost cap and attempt limit
+  - daily public, daily total and lifetime caps, reserved before a run and
+    settled to the real metered cost afterwards
+  - per-IP hourly limit and a judge code
+
+  Without a shared Redis store, only judge-code runs are allowed.
+- **Opt-in model fallback** (`MODEL_FALLBACK`, e.g. Ultra → Lightning) for the
+  demo. It is off for benchmarks; the metered row always names the model that
+  actually answered.
+- **Replay recorder** (`scripts/record_replay.py`): saves a real live campaign's
+  event stream with its real timings, as a labelled fallback for the UI.
+- **Run directories** get a random suffix: two runs in the same second used to
+  overwrite each other.
+- **Fix:** `wilson()` returned 0.99999… instead of 1.0 at k = n (float drift).
+  Found by a new property test.
+- **Fix:** the `.env` loader now handles inline comments. Before, a blank value
+  followed by a comment was read as the comment text.
+- **Tests:** 1 → 24 offline tests:
+  - statistics and verdicts
+  - sanitizer and metering
+  - event stream and budget stop
+  - spend guard: fail-closed, caps, settlement, IP limit, store outage, kill switch
+  - streaming API
+- **CI:** GitHub Actions runs pytest, a dry-run of every scenario, and gitleaks.
+- **Secret scan:** gitleaks over the full history found only the deliberately
+  fake fixture secret. The default rules do *not* recognise Nebius Token Factory
+  keys, so `.gitleaks.toml` adds a rule for them; it is verified to catch the
+  real key in the git-ignored `.env`. A direct search confirmed the key is in no
+  commit.
+- **Results committed** under `results/`: the 15 Oct benchmark report, the
+  model comparison, and per-model campaign cost/latency
+  (`scripts/campaign_stats.py`; reads only token/latency/cost fields).
+  Median full campaign: Lightning $0.0071 / 9.0 s, Nano $0.0202 / 33.5 s,
+  Ultra $0.0379 / 28.1 s of model time.
+- **Corrected a claim:** an "~83% refusal with reasoning on" figure in a code
+  comment had no saved run behind it. It is replaced by the logged numbers
+  (25–54% across the 60-trial run).
+- **README** rewritten: results, model comparison, rigor story, Mermaid
+  architecture, model roles and settings, quickstart, web API, tests/CI, known
+  limitations and model licenses.
+- **Web UI markup** (`public/index.html`, `public/style.css`). The interactive
+  script is still to come.
+
+Started: a second, independent 60-trial benchmark run to check that the
+15 Oct numbers replicate.

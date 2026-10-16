@@ -45,3 +45,24 @@ Minor friction:
 - Nothing blocking. Onboarding (key -> first successful call) was quick once the
   key was in `.env`. Watch: confirm whether `reasoning_tokens` is already counted
   inside `completion_tokens` for billing (affects whether cost double-counts).
+
+### 2026-10-16: secret scanning does not know Token Factory keys
+
+- **Step:** ran gitleaks 8.30.1 (default rules) over the repo before pushing the
+  web demo.
+- **Observed:** it flagged our *fake* fixture token, but **not** the real Nebius
+  Token Factory key sitting in `.env` (a ~230-character dotted token).
+- **Impact:** anyone relying on default secret scanning (gitleaks, likely also
+  GitHub push protection) could push a Token Factory key without a warning. With
+  no spend cap on the account, a leaked key is directly billable.
+- **Workaround:** custom rule in `.gitleaks.toml`, plus a direct search of the
+  history for the key value.
+- **Ask:** publish a recognisable key prefix/format and register it with GitHub
+  secret scanning and gitleaks; offer per-key spend limits.
+
+### 2026-10-16: no spend cap shapes the whole demo design
+
+- No account- or key-level spend limit, and HTTP 402 arrives mid-call. A public
+  demo that must stay up until 15 Dec therefore needs its own reservation-based
+  budget ledger (Redis), per-run caps and a kill switch: about 200 lines of
+  code and tests that a per-key limit would make unnecessary.

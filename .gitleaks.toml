@@ -1,0 +1,24 @@
+# Secret scanning config. Extends the default rules with a Nebius Token Factory
+# key rule (the defaults do not recognise that format) and allowlists the
+# deliberately fake fixture secret the scenarios use.
+title = "sieve"
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "nebius-token-factory-key"
+description = "Nebius Token Factory API key"
+regex = '''(?i)nebius[a-z_]*key\s*[=:]\s*['"]?([A-Za-z0-9._\-]{60,})'''
+secretGroup = 1
+keywords = ["nebius"]
+
+[[rules]]
+id = "nebius-token-factory-key-bare"
+description = "Long Nebius-style key token (2-char prefix, dot, long body)"
+regex = '''\b[A-Za-z0-9]{2}\.[A-Za-z0-9._\-]{200,}'''
+
+[allowlist]
+description = "Synthetic fixtures and git-ignored run output"
+regexes = ['''SYNTHETIC-SECRET-[A-Z0-9]+''']
+paths = ['''(^|/)runs/''', '''(^|/)runs_test/''']

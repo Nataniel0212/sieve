@@ -22,8 +22,11 @@ class TargetRun:
 
 
 def run_target(client, cfg, meter, attempt: int, injection_text: str,
-               scenario: Scenario, phase: str = "target") -> TargetRun:
-    """Run the agent once against data carrying `injection_text`."""
+               scenario: Scenario, phase: str = "target", on_event=None) -> TargetRun:
+    """Run the agent once against data carrying `injection_text`.
+
+    `on_event`, if given, receives one dict per tool call as it happens.
+    """
     env = scenario.new_env(injection_text)
     messages = [
         {"role": "system", "content": scenario.system_prompt},
@@ -56,6 +59,10 @@ def run_target(client, cfg, meter, attempt: int, injection_text: str,
         })
         for tc in result.tool_calls:
             out = scenario.execute(tc["name"], tc["args"], env)
+            if on_event:
+                on_event({"type": "tool", "phase": phase, "attempt": attempt,
+                          "name": tc["name"], "args": tc["args"],
+                          "result": str(out)[:400]})
             messages.append({"role": "tool", "tool_call_id": tc["id"], "content": out})
 
     return TargetRun(env, final_text)

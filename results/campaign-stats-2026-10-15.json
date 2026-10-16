@@ -1,0 +1,29 @@
+{
+  "nvidia/Nemotron-3_5-Lightning": {
+    "campaigns": 30,
+    "median_cost_usd": 0.00711,
+    "median_model_time_s": 8.97,
+    "median_cost_per_attempt_usd": 0.00209,
+    "median_attacker_call_s": 1.4,
+    "median_target_call_s": 0.36,
+    "total_cost_usd": 0.4025
+  },
+  "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B": {
+    "campaigns": 30,
+    "median_cost_usd": 0.02018,
+    "median_model_time_s": 33.47,
+    "median_cost_per_attempt_usd": 0.00242,
+    "median_attacker_call_s": 1.49,
+    "median_target_call_s": 0.8,
+    "total_cost_usd": 0.5759
+  },
+  "nvidia/Nemotron-3-Ultra-550b-a55b": {
+    "campaigns": 30,
+    "median_cost_usd": 0.03787,
+    "median_model_time_s": 28.14,
+    "median_cost_per_attempt_usd": 0.00379,
+    "median_attacker_call_s": 1.25,
+    "median_target_call_s": 0.56,
+    "total_cost_usd": 1.2891
+  }
+}

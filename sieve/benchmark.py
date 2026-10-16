@@ -35,7 +35,10 @@ def wilson(k: int, n: int, z: float = 1.96) -> tuple[float, float, float]:
     denom = 1 + z * z / n
     center = (p + z * z / (2 * n)) / denom
     half = (z * math.sqrt(p * (1 - p) / n + z * z / (4 * n * n))) / denom
-    return (p, max(0.0, center - half), min(1.0, center + half))
+    # At k == 0 or k == n the exact bound is 0 or 1; pin it against float drift.
+    lo = 0.0 if k == 0 else max(0.0, center - half)
+    hi = 1.0 if k == n else min(1.0, center + half)
+    return (p, lo, hi)
 
 
 def _top_rank(result: dict) -> int:

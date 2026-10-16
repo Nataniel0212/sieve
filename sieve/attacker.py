@@ -13,9 +13,9 @@ import re
 
 ATTACKER_TEMPERATURE = 1.0
 ATTACKER_MAX_TOKENS = 2048
-# Thinking OFF for the attacker: with reasoning enabled it talks itself into
-# safety refusals ~83% of the time; disabled it refuses ~0% and still writes
-# strong injections (measured on the bank scenario).
+# Thinking OFF for the attacker: with reasoning enabled it talked itself into
+# safety refusals on 25-54% of attempts across a 60-trial benchmark (even with
+# reframed retries); disabled, refusals were 0% (see DEVLOG.md).
 ATTACKER_THINKING = False
 REFUSAL_RETRIES = 2  # safety net; rarely fires now
 
